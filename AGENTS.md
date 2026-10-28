@@ -54,18 +54,23 @@ le code AGPL (RaceIQ) ne doit **jamais** être recopié (licence virale).
 - **Transport navigateur** : SSE `/events` (60 Hz), état via `/health`, archives via
   `/sessions`, `/sessions/:id/data` (binaire `FH6S`) et `DELETE /sessions/:id`
 - **Frontend** : `public/` en modules ES natifs, import map Three.js
-- **Three.js** : servi depuis `node_modules/three` via `/vendor/build/*` et
+- **Three.js** : servi depuis `vendor/three` (copie figée générée par
+  `npm run package`) ou `node_modules/three` en dev, via `/vendor/build/*` et
   `/vendor/addons/*` ; aucun bundler, ne pas déplacer ces routes sans mettre à jour
   l'import map de `public/index.html`
 - **Simulateur** : `tools/simulate.ts`, envoie 60 paquets/s à `127.0.0.1:9999`
+- **Distribution Windows** : `scripts/bundle.mjs` (esbuild → `build/server.cjs`) puis
+  `scripts/package.mjs` (tsc → bundle → vendorisation → pkg → ZIP → SHA-256)
 
-| Commande        | Rôle                                |
-| --------------- | ----------------------------------- |
-| `npm run dev`   | serveur en mode watch               |
-| `npm run build` | compilation TypeScript vers `dist/` |
-| `npm start`     | serveur compilé                     |
-| `npm test`      | tests du décodeur et des sessions   |
-| `npm run sim`   | simulateur de flux à 60 Hz          |
+| Commande         | Rôle                                        |
+| ---------------- | ------------------------------------------- |
+| `npm run dev`    | serveur en mode watch                       |
+| `npm run build`  | compilation TypeScript vers `dist/`         |
+| `npm start`      | serveur compilé                             |
+| `npm test`       | tests du décodeur et des sessions           |
+| `npm run sim`    | simulateur de flux à 60 Hz                  |
+| `npm run bundle` | bundle CommonJS pour pkg (`build/`)         |
+| `npm run package`| exe + ZIP + SHA-256 dans `release/`         |
 
 ## Structure
 
@@ -75,12 +80,15 @@ HUD_FH6/
 ├── Documentation/     # Doc Data Out officielle et références
 ├── data/sessions/     # Archives des courses (créé au démarrage, ignoré par Git)
 ├── public/            # Dashboard : index.html, style.css, hud.js
+├── scripts/           # bundle.mjs (esbuild), package.mjs (release Windows)
 ├── src/
 │   ├── server.ts      # HTTP + SSE + service des fichiers/vendor
 │   └── telemetry/     # decode.ts, udp.ts, sessions.ts, fields.ts
 ├── test/              # Tests du décodeur et des sessions
 ├── tools/             # simulate.ts
 ├── assets/            # Polices, images, icônes
+├── vendor/            # Copie figée de Three.js (générée, ignorée par Git)
+├── release/           # exe, ZIP, SHA-256 (généré, ignoré par Git)
 └── README.md          # Présentation publique du dépôt
 ```
 
@@ -94,12 +102,13 @@ HUD_FH6/
 - [x] Archivage des sessions sur disque + analyse interactive (tracé par tour, clic)
 - [x] Unités métriques / impériales (bascule, détection navigateur, préférence mémorisée)
 - [x] Architecture « second PC » documentée (UDP LAN, pare-feu, ports)
+- [x] Distribution Windows : exécutable autonome (pkg) + ZIP, release `v0.1.0`
 - [ ] Tests en conditions réelles avec FH6
 
 ## Notes techniques
 
 - Le dashboard est un fichier JS unique (`public/hud.js`) sans bundler ; la carte 3D
-  utilise Three.js chargé depuis `node_modules` via l'import map.
+  utilise Three.js chargé via l'import map (`/vendor/build/*`, `/vendor/addons/*`).
 - `public/hud.js` bascule sur une boucle `setTimeout` si `requestAnimationFrame` est
   gelé (fenêtre occultée) ; l'URL `?debug=1` expose `window.__hud` pour l'inspection.
 - La pression des pneus n'est pas dans le paquet FH6 : afficher « Pression n/d »,
@@ -114,6 +123,16 @@ HUD_FH6/
 - Les unités sont un choix purement client (`public/hud.js`) : conversion à
   l'affichage depuis les valeurs brutes (m/s, °F, mètres), préférence dans
   `localStorage` (`hud-fh6:units`). Le serveur et les archives restent inchangés.
+- Mode packagé : `IS_PACKAGED` (présence de `process.pkg`) distingue les ressources
+  lues dans le snapshot (`APP_ROOT`) des données écrites à côté de l'exe (`DATA_ROOT`).
+  `__dirname` vient du bundle CJS ; le repli `import.meta.url` ne sert qu'en dev ESM.
+- pkg réécrit les modules ESM trouvés sous `node_modules` (Three.js servi tronqué et
+  transformé) : ne **jamais** remettre `node_modules/three/**` dans `pkg.assets`,
+  passer par la copie `vendor/three/` produite par `npm run package`.
+- pkg doit être lancé avec `--config package.json`, sinon aucun asset n'est embarqué
+  (404 sur tout le statique de l'exe).
+- L'exe n'est pas signé : SmartScreen avertit au premier lancement (documenté dans
+  `LISEZ-MOI.txt` et le README).
 
 ## Attendus envers les agents
 

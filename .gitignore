@@ -9,6 +9,8 @@ node_modules/
 # Builds
 dist/
 build/
+release/
+vendor/
 
 # Enregistrements de sessions (données locales, jamais versionnées)
 data/

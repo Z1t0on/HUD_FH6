@@ -8,11 +8,25 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
+    "bundle": "node scripts/bundle.mjs",
+    "package": "node scripts/package.mjs",
     "test": "tsx --test test/*.test.ts",
     "sim": "tsx tools/simulate.ts"
   },
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "assets/**/*",
+      "vendor/**/*"
+    ],
+    "targets": [
+      "node22-win-x64"
+    ]
+  },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@yao-pkg/pkg": "^6.24.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   },

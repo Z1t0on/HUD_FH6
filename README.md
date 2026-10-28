@@ -79,6 +79,41 @@ npm run sim
 Le simulateur envoie des paquets à `127.0.0.1:9999` à 60 Hz et simule un tour de
 circuit avec altitude, rapports, pédales, températures et chronos.
 
+## Version portable (Windows x64)
+
+Pour le PC d'affichage, la [page des releases](https://github.com/Z1t0on/HUD_FH6/releases)
+fournit un exécutable autonome : **aucune installation de Node.js n'est nécessaire**.
+
+1. Télécharger `HUD-FH6-<version>-win-x64.zip` et l'extraire dans un dossier inscriptible
+   (par exemple `C:\HUD_FH6`), ou récupérer directement `HUD_FH6.exe`.
+2. Double-cliquer sur `HUD_FH6.exe` : une console affiche l'adresse du dashboard
+   (`http://localhost:3000`) et l'IPv4 du PC à saisir dans le jeu.
+3. Ouvrir cette adresse dans un navigateur ; configurer Forza comme plus bas.
+
+Les sessions sont archivées dans `data\sessions`, **à côté de l'exécutable** : déplacer
+l'`.exe` dans un dossier protégé (Program Files…) empêche l'écriture des archives.
+
+> L'exécutable n'est pas signé numériquement : au premier lancement, SmartScreen peut
+> afficher un avertissement. Cliquer sur « Informations complémentaires » puis
+> « Exécuter quand même ». Les empreintes SHA-256 sont publiées avec chaque release.
+
+### Construire la distribution
+
+```powershell
+npm install
+npm run package
+```
+
+La commande enchaîne la compilation TypeScript, le bundle esbuild (`build/server.cjs`),
+la copie figée de Three.js (`vendor/three/`), l'exécutable pkg, l'archive ZIP et les
+empreintes. Résultat dans `release/` :
+
+| Fichier                              | Contenu                                    |
+| ------------------------------------ | ------------------------------------------ |
+| `HUD-FH6-<version>-win-x64/HUD_FH6.exe` | exécutable autonome (Node 22 embarqué)  |
+| `HUD-FH6-<version>-win-x64.zip`      | l'exécutable + `LISEZ-MOI.txt` + `README.md` |
+| `SHA256SUMS.txt`                     | empreintes des deux fichiers ci-dessus     |
+
 ## Configuration dans Forza Horizon 6
 
 1. Lancer le HUD sur le PC d'affichage (`npm run dev`).
@@ -105,13 +140,15 @@ npm run dev
 
 ## Commandes
 
-| Commande        | Rôle                                   |
-| --------------- | -------------------------------------- |
-| `npm run dev`   | serveur en mode watch                  |
-| `npm run build` | compilation TypeScript vers `dist/`    |
-| `npm start`     | serveur compilé                        |
-| `npm test`      | tests du décodeur et des sessions      |
-| `npm run sim`   | simulateur de paquets à 60 Hz          |
+| Commande         | Rôle                                        |
+| ---------------- | ------------------------------------------- |
+| `npm run dev`    | serveur en mode watch                       |
+| `npm run build`  | compilation TypeScript vers `dist/`         |
+| `npm start`      | serveur compilé                             |
+| `npm test`       | tests du décodeur et des sessions           |
+| `npm run sim`    | simulateur de paquets à 60 Hz               |
+| `npm run bundle` | bundle CommonJS du serveur (`build/`)       |
+| `npm run package`| distribution Windows : exe, ZIP, SHA-256     |
 
 ## Carte 3D
 
@@ -192,6 +229,7 @@ HUD_FH6/
 ├── Documentation/     # Doc Data Out et notes de recherche
 ├── data/sessions/     # Archives des courses (ignoré par Git)
 ├── public/            # Dashboard (HTML, CSS, JS, import map Three.js)
+├── scripts/           # bundle.mjs (esbuild) et package.mjs (release Windows)
 ├── src/
 │   ├── server.ts      # HTTP + SSE + UDP → navigateur
 │   └── telemetry/     # Décodeur, écouteur UDP, archives de sessions
@@ -201,6 +239,8 @@ HUD_FH6/
 ├── screenshot-demo.png
 └── README.md
 ```
+
+`vendor/three/` et `release/` sont générés par `npm run package` et ignorés par Git.
 
 ## Limites connues
 

@@ -1,16 +1,31 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer, type ServerResponse } from "node:http";
 import { networkInterfaces } from "node:os";
-import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { dirname, extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Telemetry } from "./telemetry/decode.js";
 import { SessionStore } from "./telemetry/sessions.js";
 import { listenTelemetry } from "./telemetry/udp.js";
 
-const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const PUBLIC_DIR = join(ROOT, "public");
-const THREE_DIR = join(ROOT, "node_modules", "three");
-const SESSIONS_DIR = process.env.HUD_SESSIONS_DIR ?? join(ROOT, "data", "sessions");
+/** Vrai dans l'exécutable Windows produit par pkg (snapshot en lecture seule). */
+const IS_PACKAGED = Boolean((process as typeof process & { pkg?: unknown }).pkg);
+
+/** `__dirname` vient du bundle CommonJS ; en ESM on repart de `import.meta.url`. */
+const MODULE_DIR =
+  typeof __dirname === "string" ? __dirname : dirname(fileURLToPath(import.meta.url));
+
+/** Ressources embarquées : racine du projet en dev, snapshot pkg dans l'exécutable. */
+const APP_ROOT = resolve(MODULE_DIR, "..");
+/** Données modifiables : à côté de l'exécutable en version packagée. */
+const DATA_ROOT = IS_PACKAGED ? dirname(process.execPath) : APP_ROOT;
+
+const PUBLIC_DIR = join(APP_ROOT, "public");
+/** Three.js servi au navigateur : copie figée (vendor/) ou node_modules en dev. */
+const VENDOR_DIR = join(APP_ROOT, "vendor", "three");
+const THREE_DIR = existsSync(join(VENDOR_DIR, "build"))
+  ? VENDOR_DIR
+  : join(APP_ROOT, "node_modules", "three");
+const SESSIONS_DIR = process.env.HUD_SESSIONS_DIR ?? join(DATA_ROOT, "data", "sessions");
 
 const HTTP_PORT = Number(process.env.HUD_PORT ?? 3000);
 const UDP_PORT = Number(process.env.UDP_PORT ?? 9999);
