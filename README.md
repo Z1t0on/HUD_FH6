@@ -25,6 +25,9 @@ données est le flux UDP officiel.
 - **Analyse** : rejouer une session, cliquer sur n'importe quel point du tracé pour
   lire la télémétrie de cet instant (tour, rapport, vitesse, températures, G…) et
   faire défiler le temps au curseur
+- **Unités internationales** : bascule métrique ↔ impérial (km/h ↔ mph, °C ↔ °F,
+  m ↔ ft/mi) via le bouton de la barre supérieure, détection automatique selon la
+  langue du navigateur et préférence mémorisée
 
 > La **pression des pneus n'est pas transmise** par le paquet FH6 : le HUD affiche
 > « Pression n/d » plutôt qu'une valeur inventée.
@@ -124,6 +127,24 @@ npm run dev
 Le tracé est construit à partir des positions reçues : il ne représente que le trajet
 parcouru depuis l'ouverture du dashboard. La ligne verticale et le repère au sol
 matérialisent l'altitude de la voiture par rapport au sol.
+
+## Unités
+
+Le bouton de la barre supérieure bascule entre deux systèmes, appliqués à tout le HUD
+(instruments, inspecteur, carte, sessions) :
+
+| Élément        | Métrique       | Impérial        |
+| -------------- | -------------- | --------------- |
+| Vitesse        | km/h (rappel mph) | mph (rappel km/h) |
+| Températures   | °C             | °F              |
+| Altitude, X/Z  | m              | ft              |
+| Distances      | m / km         | ft / mi         |
+| Échelle carte  | 1 carreau = 20 m | 1 carreau = 66 ft |
+
+Le système par défaut est déduit de la langue du navigateur (États-Unis, Liberia,
+Myanmar → impérial). Le choix manuel est mémorisé dans `localStorage`
+(`hud-fh6:units`). Les données archivées restent brutes (m/s, °F, mètres) : seuls
+l'affichage et les unités de l'interface changent.
 
 ## Sessions et analyse
 

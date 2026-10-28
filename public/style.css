@@ -153,6 +153,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.units-btn {
+  min-width: 88px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .btn {
   appearance: none;
   padding: 7px 12px;
@@ -569,6 +575,19 @@ body {
   text-transform: uppercase;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.map-metrics span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.map-metrics .unit,
+.inspector-meta .unit {
+  font-style: normal;
+  font-weight: 400;
+  margin-left: 2px;
 }
 
 .map-metrics b {
@@ -1037,8 +1056,13 @@ body {
 .inspector-pedals span,
 .inspector-meta span {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 6px;
+}
+
+.inspector-meta b {
+  margin-left: auto;
 }
 
 .inspector-pedals b,

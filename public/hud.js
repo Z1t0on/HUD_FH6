@@ -16,7 +16,10 @@ const conn = $("conn");
 const statusEl = $("status");
 
 const speedEl = $("speed");
-const speedMphEl = $("speed-mph");
+const speedSecondaryEl = $("speed-secondary");
+const speedUnitEl = $("speed-unit");
+const speedSecondaryUnitEl = $("speed-secondary-unit");
+const unitsButton = $("units-toggle");
 const gearEl = $("gear");
 const rpmEl = $("rpm");
 const rpmArc = $("rpm-arc");
@@ -43,8 +46,12 @@ const deltaEl = $("delta");
 const deltaValueEl = $("delta-value");
 
 const altitudeEl = $("altitude");
+const altitudeUnitEl = $("altitude-unit");
 const posXEl = $("pos-x");
+const posXUnitEl = $("pos-x-unit");
 const posZEl = $("pos-z");
+const posZUnitEl = $("pos-z-unit");
+const mapHintEl = $("map-hint");
 
 const followToggle = $("follow-toggle");
 const viewIsoButton = $("view-iso");
@@ -74,6 +81,7 @@ const inspectorEls = {
   lap: $("inspector-lap"),
   laptime: $("inspector-laptime"),
   speed: $("inspector-speed"),
+  speedUnit: $("inspector-speed-unit"),
   gear: $("inspector-gear"),
   rpm: $("inspector-rpm"),
   throttle: $("inspector-throttle"),
@@ -83,8 +91,11 @@ const inspectorEls = {
   gx: $("inspector-gx"),
   gz: $("inspector-gz"),
   alt: $("inspector-alt"),
+  altUnit: $("inspector-alt-unit"),
   x: $("inspector-x"),
+  xUnit: $("inspector-x-unit"),
   z: $("inspector-z"),
+  zUnit: $("inspector-z-unit"),
   position: $("inspector-position"),
   clock: $("inspector-clock"),
   tires: {
@@ -136,6 +147,156 @@ const TIRE_COLORS = {
   overheat: "#ff3b3b",
 };
 
+/* ------------------------------- Unités */
+
+const UNITS_STORAGE_KEY = "hud-fh6:units";
+const MS_TO_KMH = 3.6;
+const MS_TO_MPH = 2.23693629;
+const METERS_TO_FEET = 3.280839895;
+const METERS_TO_MILES = 1 / 1609.344;
+const GRID_CELL_METERS = 20;
+
+/** Pays qui utilisent encore les unités impériales dans la vie courante. */
+const IMPERIAL_REGIONS = new Set(["US", "LR", "MM"]);
+
+const LOCALE =
+  (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || "fr-FR";
+
+function detectUnitSystem() {
+  try {
+    const stored = localStorage.getItem(UNITS_STORAGE_KEY);
+    if (stored === "metric" || stored === "imperial") return stored;
+  } catch {
+    // Stockage indisponible (navigation privée) : on garde la détection par langue.
+  }
+
+  const tags = Array.isArray(navigator.languages) && navigator.languages.length
+    ? navigator.languages
+    : [navigator.language];
+  for (const tag of tags) {
+    if (!tag) continue;
+    try {
+      const region = new Intl.Locale(tag).maximize().region;
+      if (region && IMPERIAL_REGIONS.has(region)) return "imperial";
+    } catch {
+      // Locale exotique : on retombe sur l'analyse de la chaîne.
+    }
+    if (/(?:^|[-_])US(?:$|[-_])/i.test(tag)) return "imperial";
+  }
+  return "metric";
+}
+
+let unitSystem = detectUnitSystem();
+
+const isImperial = () => unitSystem === "imperial";
+
+function speedUnit() {
+  return isImperial() ? "MPH" : "KM/H";
+}
+
+function secondarySpeedUnit() {
+  return isImperial() ? "KM/H" : "MPH";
+}
+
+/** Vitesse en m/s convertie dans l'unité principale. */
+function convertSpeed(metersPerSecond) {
+  return isImperial() ? metersPerSecond * MS_TO_MPH : metersPerSecond * MS_TO_KMH;
+}
+
+/** Vitesse en m/s convertie dans l'unité secondaire (rappel). */
+function convertSecondarySpeed(metersPerSecond) {
+  return isImperial() ? metersPerSecond * MS_TO_KMH : metersPerSecond * MS_TO_MPH;
+}
+
+function lengthUnit() {
+  return isImperial() ? "ft" : "m";
+}
+
+function convertLength(meters) {
+  return isImperial() ? meters * METERS_TO_FEET : meters;
+}
+
+function formatLength(meters) {
+  if (!Number.isFinite(meters)) return "—";
+  if (!isImperial()) {
+    return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+  }
+  const feet = meters * METERS_TO_FEET;
+  return feet >= 5280 ? `${(meters * METERS_TO_MILES).toFixed(1)} mi` : `${Math.round(feet)} ft`;
+}
+
+function formatTemperature(fahrenheit) {
+  if (!Number.isFinite(fahrenheit) || fahrenheit <= 0) return "—";
+  return isImperial()
+    ? `${Math.round(fahrenheit)}°F`
+    : `${Math.round(fahrenheitToCelsius(fahrenheit))}°C`;
+}
+
+function mapScaleHint() {
+  const cell = isImperial()
+    ? `${Math.round(GRID_CELL_METERS * METERS_TO_FEET)} ft`
+    : `${GRID_CELL_METERS} m`;
+  return `Glisser pour orbiter · molette pour zoomer · 1 carreau = ${cell}`;
+}
+
+function applyUnitLabels() {
+  const length = lengthUnit();
+
+  speedUnitEl.textContent = speedUnit();
+  speedSecondaryUnitEl.textContent = secondarySpeedUnit();
+  inspectorEls.speedUnit.textContent = speedUnit();
+
+  altitudeUnitEl.textContent = length;
+  posXUnitEl.textContent = length;
+  posZUnitEl.textContent = length;
+  inspectorEls.altUnit.textContent = length;
+  inspectorEls.xUnit.textContent = length;
+  inspectorEls.zUnit.textContent = length;
+
+  mapHintEl.textContent = mapScaleHint();
+
+  unitsButton.textContent = isImperial() ? "MPH · °F" : "KM/H · °C";
+  unitsButton.dataset.units = unitSystem;
+  unitsButton.setAttribute(
+    "aria-label",
+    isImperial() ? "Système d'unités : impérial" : "Système d'unités : métrique",
+  );
+  unitsButton.title = isImperial()
+    ? "Passer au système métrique (km/h, °C, m)"
+    : "Passer au système impérial (mph, °F, ft)";
+}
+
+/** Réaffiche les valeurs visibles après un changement d'unités. */
+function refreshUnitReadouts() {
+  if (analysis) {
+    const index = analysis.sampleIndex ?? 0;
+    const telemetry = sampleToTelemetry(analysis, index);
+    smoothed.initialized = false;
+    smoothed.speed = telemetry.speed;
+    renderInstruments(telemetry);
+    updateInspector(index);
+  } else if (latest) {
+    if (Number.isFinite(latest.position?.y)) renderLivePosition(latest.position);
+    smoothed.speed = latest.speed;
+    renderInstruments(latest);
+  }
+
+  if (!sessionsModal.hidden) renderSessionList(lastSessionsPayload ?? { sessions });
+}
+
+function setUnitSystem(next) {
+  const value = next === "imperial" ? "imperial" : "metric";
+  if (value === unitSystem) return;
+  unitSystem = value;
+  try {
+    localStorage.setItem(UNITS_STORAGE_KEY, value);
+  } catch {
+    // Préférence non persistée : le choix reste actif pour la session en cours.
+  }
+  applyUnitLabels();
+  refreshUnitReadouts();
+}
+
 /* ------------------------------- État */
 
 let latest = null;
@@ -160,6 +321,7 @@ let lastLiveLap = null;
 let mode = "live";
 let analysis = null;
 let sessions = [];
+let lastSessionsPayload = null;
 
 let followCar = true;
 let currentHeading = 0;
@@ -221,7 +383,7 @@ function lapColorRgb(lapNumber) {
 
 function formatDistance(meters) {
   if (!Number.isFinite(meters) || meters <= 0) return "—";
-  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+  return formatLength(meters);
 }
 
 function formatBytes(bytes) {
@@ -232,7 +394,7 @@ function formatBytes(bytes) {
 
 function formatDateTime(epochMs) {
   if (!Number.isFinite(epochMs)) return "—";
-  return new Date(epochMs).toLocaleString("fr-FR", {
+  return new Date(epochMs).toLocaleString(LOCALE, {
     dateStyle: "short",
     timeStyle: "short",
   });
@@ -699,6 +861,12 @@ fullscreenButton.addEventListener("click", () => {
 
 /* ------------------------------- Mise à jour télémétrie */
 
+function renderLivePosition(position) {
+  altitudeEl.textContent = String(Math.round(convertLength(position.y)));
+  posXEl.textContent = String(Math.round(convertLength(position.x)));
+  posZEl.textContent = String(Math.round(convertLength(position.z)));
+}
+
 function updateTelemetry(telemetry) {
   const isFirstPacket = !hasReceivedData;
 
@@ -723,9 +891,7 @@ function updateTelemetry(telemetry) {
         }
       }
 
-      altitudeEl.textContent = position.y.toFixed(0);
-      posXEl.textContent = position.x.toFixed(0);
-      posZEl.textContent = position.z.toFixed(0);
+      renderLivePosition(position);
     }
   }
 
@@ -850,10 +1016,10 @@ function renderInstruments(telemetry) {
     smoothed.speed += (telemetry.speed - smoothed.speed) * 0.22;
   }
 
-  const speedKmh = Math.max(0, Math.round(smoothed.speed * 3.6));
-  const speedMph = Math.max(0, Math.round(smoothed.speed * 2.23693629));
-  speedEl.textContent = String(speedKmh);
-  speedMphEl.textContent = String(speedMph);
+  const speedPrimary = Math.max(0, Math.round(convertSpeed(smoothed.speed)));
+  const speedSecondary = Math.max(0, Math.round(convertSecondarySpeed(smoothed.speed)));
+  speedEl.textContent = String(speedPrimary);
+  speedSecondaryEl.textContent = String(speedSecondary);
   gearEl.textContent = gearLabel(telemetry.gear);
 
   const maxRpm = telemetry.engineMaxRpm > 1000 ? telemetry.engineMaxRpm : 8000;
@@ -871,7 +1037,7 @@ function renderInstruments(telemetry) {
   }
   cluster.classList.toggle("shift-active", ratio >= SHIFT_THRESHOLD);
 
-  rpmEl.textContent = Math.round(telemetry.rpm).toLocaleString("fr-FR");
+  rpmEl.textContent = Math.round(telemetry.rpm).toLocaleString(LOCALE);
 
   const throttle = telemetry.throttle / 255;
   const brake = telemetry.brake / 255;
@@ -900,7 +1066,7 @@ function renderInstruments(telemetry) {
     }
     const celsius = fahrenheitToCelsius(fahrenheit);
     element.dataset.state = tireState(celsius);
-    element.querySelector(".tire-temp").textContent = `${Math.round(celsius)}°C`;
+    element.querySelector(".tire-temp").textContent = formatTemperature(fahrenheit);
   }
 
   lapCurrentEl.textContent = formatLap(telemetry.currentLap);
@@ -950,7 +1116,7 @@ function renderLapLegend(laps, interactive) {
       chip.classList.add("is-interactive");
       chip.addEventListener("click", () => {
         if (!analysis) return;
-        const index = Math.max(0, Math.min(lap.startSample, analysis.session.count - 1));
+        const index = Math.max(0, Math.min(lap.startSample, analysis.count - 1));
         selectSample(index);
       });
     }
@@ -1003,7 +1169,7 @@ function sessionRow(meta) {
     makeStat("Durée", formatLap(meta.duration)),
     makeStat("Meilleur", meta.bestLap > 0 ? formatLap(meta.bestLap) : "—"),
     makeStat("Distance", formatDistance(meta.distance)),
-    makeStat("V. max", `${Math.round(meta.maxSpeed * 3.6)} km/h`),
+    makeStat("V. max", `${Math.round(convertSpeed(meta.maxSpeed))} ${speedUnit().toLowerCase()}`),
   );
 
   const actions = document.createElement("div");
@@ -1029,7 +1195,8 @@ function sessionRow(meta) {
 }
 
 function renderSessionList(data) {
-  const list = data?.sessions ?? sessions;
+  const payload = data ?? lastSessionsPayload;
+  const list = payload?.sessions ?? sessions;
   sessionsListEl.replaceChildren();
 
   if (!list.length) {
@@ -1042,8 +1209,8 @@ function renderSessionList(data) {
     return;
   }
 
-  const totalBytes = data?.totalBytes ?? list.reduce((sum, meta) => sum + (meta.bytes || 0), 0);
-  const keep = data?.keep ?? 40;
+  const totalBytes = payload?.totalBytes ?? list.reduce((sum, meta) => sum + (meta.bytes || 0), 0);
+  const keep = payload?.keep ?? 40;
   sessionsSummaryEl.textContent = `${list.length} session(s) · ${formatBytes(totalBytes)} · conservation : ${keep} max`;
 
   for (const meta of list) {
@@ -1057,6 +1224,7 @@ async function refreshSessions({ render = true } = {}) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    lastSessionsPayload = data;
     sessionsCountEl.textContent = String(sessions.length);
     if (render) renderSessionList(data);
     return data;
@@ -1419,9 +1587,11 @@ function updateInspector(sample) {
 
   inspectorEls.lap.textContent = `TOUR ${get("lapNumber") + 1}`;
   inspectorEls.laptime.textContent = formatLap(get("lapTime"));
-  inspectorEls.speed.textContent = String(Math.round(Math.max(0, get("speed")) * 3.6));
+  inspectorEls.speed.textContent = String(
+    Math.round(Math.max(0, convertSpeed(get("speed")))),
+  );
   inspectorEls.gear.textContent = gearLabel(get("gear"));
-  inspectorEls.rpm.textContent = Math.round(get("rpm")).toLocaleString("fr-FR");
+  inspectorEls.rpm.textContent = Math.round(get("rpm")).toLocaleString(LOCALE);
 
   const throttle = get("throttle") / 255;
   const brake = get("brake") / 255;
@@ -1450,14 +1620,14 @@ function updateInspector(sample) {
     }
     const celsius = fahrenheitToCelsius(fahrenheit);
     element.dataset.state = tireState(celsius);
-    value.textContent = `${Math.round(celsius)}°C`;
+    value.textContent = formatTemperature(fahrenheit);
   }
 
   inspectorEls.gx.textContent = (get("accelX") / 9.81).toFixed(2);
   inspectorEls.gz.textContent = (get("accelZ") / 9.81).toFixed(2);
-  inspectorEls.alt.textContent = get("y").toFixed(0);
-  inspectorEls.x.textContent = get("x").toFixed(0);
-  inspectorEls.z.textContent = get("z").toFixed(0);
+  inspectorEls.alt.textContent = String(Math.round(convertLength(get("y"))));
+  inspectorEls.x.textContent = String(Math.round(convertLength(get("x"))));
+  inspectorEls.z.textContent = String(Math.round(convertLength(get("z"))));
   const position = get("racePosition");
   inspectorEls.position.textContent = position > 0 ? `P${Math.round(position)}` : "—";
 
@@ -1566,6 +1736,10 @@ analysisExitButton.addEventListener("click", () => exitAnalysis());
 analysisRange.addEventListener("input", () => {
   if (!analysis) return;
   selectSample(sampleIndexForTime(analysis, Number(analysisRange.value)));
+});
+
+unitsButton.addEventListener("click", () => {
+  setUnitSystem(isImperial() ? "metric" : "imperial");
 });
 
 /* ------------------------------- Scène : animation */
@@ -1749,6 +1923,7 @@ setInterval(() => {
   }
 }, 400);
 
+applyUnitLabels();
 connect();
 loadHealth();
 refreshSessions({ render: false });
@@ -1797,6 +1972,13 @@ if (new URLSearchParams(location.search).has("debug")) {
     get livePoints() {
       return live.points;
     },
+    get units() {
+      return unitSystem;
+    },
+    setUnits: setUnitSystem,
+    formatLength,
+    formatTemperature,
+    convertSpeed,
     selectSample,
     loadSession,
     exitAnalysis,

@@ -92,6 +92,7 @@ HUD_FH6/
 - [x] Décodeur du paquet 324 octets (5 tests unitaires)
 - [x] Rendu du HUD (instruments, carte 3D) et simulateur de flux
 - [x] Archivage des sessions sur disque + analyse interactive (tracé par tour, clic)
+- [x] Unités métriques / impériales (bascule, détection navigateur, préférence mémorisée)
 - [x] Architecture « second PC » documentée (UDP LAN, pare-feu, ports)
 - [ ] Tests en conditions réelles avec FH6
 
@@ -110,6 +111,9 @@ HUD_FH6/
   présente ou future du paquet reste relisible sans réenregistrement.
 - Les fichiers `.raw` orphelins (arrêt brutal du serveur) sont récupérés au démarrage
   et reconstitués en métadonnées ; ne pas les supprimer à la main sans raison.
+- Les unités sont un choix purement client (`public/hud.js`) : conversion à
+  l'affichage depuis les valeurs brutes (m/s, °F, mètres), préférence dans
+  `localStorage` (`hud-fh6:units`). Le serveur et les archives restent inchangés.
 
 ## Attendus envers les agents
 
