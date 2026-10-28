@@ -1,30 +1,146 @@
-# HUD_FH6 — HUD pour Forza Horizon 6
+# HUD_FH6 — HUD de télémétrie pour Forza Horizon 6
 
-Projet d'apprentissage : création d'un HUD (Heads-Up Display) pour Forza Horizon 6,
-avec pour objectif secondaire de se familiariser avec le fonctionnement d'OpenCode V2 desktop
-(sessions, dossiers de travail, prompts, agents).
+Dashboard de télémétrie en temps réel pour **Forza Horizon 6**, alimenté par le flux
+officiel **Data Out** (UDP). Le HUD tourne dans un navigateur, sur un **second PC du
+réseau local** : le jeu envoie ses paquets à ce PC, qui les décode et les pousse au
+dashboard via SSE.
 
-## Structure du projet
+Aucun accès mémoire au jeu, aucune modification de ses fichiers : la seule source de
+données est le flux UDP officiel.
+
+![Aperçu du dashboard](screenshot-demo.png)
+
+## Fonctionnalités
+
+- Vitesse en KM/H et MPH, rapport, compte-tours en arc avec shift light
+- Pédales accélérateur / frein / embrayage
+- Températures des 4 pneus avec code couleur thermique
+- G-force avec traînée historique
+- Chrono tour actuel / dernier / meilleur + delta dernier vs meilleur
+- Mini-carte 3D Three.js : tracé de la position X/Y/Z en temps réel, altitude,
+  caméra orbitale, suivi de la voiture et vue d'ensemble
+
+> La **pression des pneus n'est pas transmise** par le paquet FH6 : le HUD affiche
+> « Pression n/d » plutôt qu'une valeur inventée.
+
+## Architecture
+
+```
+PC jeu (Forza Horizon 6)          PC HUD
+┌──────────────────────┐         ┌──────────────────────────────────────────┐
+│ Data Out UDP 324 o   │────────▶│ serveur Node/TypeScript (port UDP 9999) │
+└──────────────────────┘         │   decode → SSE (port HTTP 3000)         │
+                                 └──────────────────┬───────────────────────┘
+                                                    │ SSE
+                                                    ▼
+                                 ┌──────────────────────────────────────────┐
+                                 │ navigateur : dashboard + carte 3D        │
+                                 └──────────────────────────────────────────┘
+```
+
+- `src/telemetry/decode.ts` : décodeur du paquet de 324 octets (Little-Endian)
+- `src/telemetry/udp.ts` : écoute UDP `0.0.0.0:9999`
+- `src/server.ts` : HTTP, SSE, service des fichiers publics et de Three.js
+- `public/` : dashboard (HTML/CSS/JS, modules ES, import map Three.js)
+- `tools/simulate.ts` : simulateur de flux pour tester sans le jeu
+
+Le format FH6 (324 octets) est identique au format « Dash » v2 de FH4/FH5 ; FH6 ajoute
+`CarGroup`, `SmashableVelDiff` et `SmashableMass`. Voir
+`Documentation/References.md` pour le détail et les licences des projets d'inspiration.
+
+## Démarrage
+
+Prérequis : Node.js 20 ou plus récent.
+
+```powershell
+npm install
+npm run dev
+```
+
+Ouvrir <http://localhost:3000>. Sans le jeu, lancer le simulateur dans un second
+terminal :
+
+```powershell
+npm run sim
+```
+
+Le simulateur envoie des paquets à `127.0.0.1:9999` à 60 Hz et simule un tour de
+circuit avec altitude, rapports, pédales, températures et chronos.
+
+## Configuration dans Forza Horizon 6
+
+1. Lancer le HUD sur le PC d'affichage (`npm run dev`).
+2. Relever l'IPv4 de ce PC avec `ipconfig` (le serveur l'affiche aussi au démarrage).
+3. Dans le jeu : **Paramètres > ATH et gameplay > Data Out**
+   - Data Out : **ON**
+   - IP : IPv4 du PC HUD (par exemple `192.168.1.42`)
+   - Port : **9999** — éviter la plage 5200–5300, réservée par le jeu
+4. Si nécessaire, autoriser le port UDP 9999 dans le pare-feu Windows du PC HUD :
+
+```powershell
+New-NetFirewallRule -DisplayName "HUD FH6 Data Out" -Direction Inbound -Protocol UDP -LocalPort 9999 -Action Allow
+```
+
+Le flux n'est émis que lorsque le joueur roule : pas de données dans les menus, la
+pause ou les replays.
+
+Si le port 9999 est déjà pris, le changer des deux côtés :
+
+```powershell
+$env:UDP_PORT = 5607
+npm run dev
+```
+
+## Commandes
+
+| Commande        | Rôle                                   |
+| --------------- | -------------------------------------- |
+| `npm run dev`   | serveur en mode watch                  |
+| `npm run build` | compilation TypeScript vers `dist/`    |
+| `npm start`     | serveur compilé                        |
+| `npm test`      | tests du décodeur                      |
+| `npm run sim`   | simulateur de paquets à 60 Hz          |
+
+## Carte 3D
+
+| Action              | Effet                                              |
+| ------------------- | -------------------------------------------------- |
+| Glisser             | orbiter autour de la scène                         |
+| Molette             | zoomer                                             |
+| **Suivi**           | la caméra suit la voiture                          |
+| **Vue iso**         | replace la caméra en vue isométrique derrière elle |
+| **Vue d'ensemble**  | cadre tout le tracé (caméra libre)                 |
+| **Effacer tracé**   | remet le tracé à zéro                              |
+
+Le tracé est construit à partir des positions reçues : il ne représente que le trajet
+parcouru depuis l'ouverture du dashboard. La ligne verticale et le repère au sol
+matérialisent l'altitude de la voiture par rapport au sol.
+
+## Structure
 
 ```
 HUD_FH6/
-├── Documentation/     # Documentation jointe et notes de recherche
-├── src/               # Code source du HUD
-├── assets/            # Polices, images, icônes du HUD
+├── Documentation/     # Doc Data Out et notes de recherche
+├── public/            # Dashboard (HTML, CSS, JS, import map Three.js)
+├── src/
+│   ├── server.ts      # HTTP + SSE + UDP → navigateur
+│   └── telemetry/     # Décodeur et écouteur UDP
+├── test/              # Tests du décodeur
+├── tools/             # Simulateur de flux
+├── assets/            # Polices, images, icônes
+├── screenshot-demo.png
 └── README.md
 ```
 
-## Roadmap
+## Limites connues
 
-- [x] Initialisation du dossier projet
-- [ ] Lecture de la documentation (`Documentation/Créer un HUD pour FH6.md`)
-- [ ] Choix de la source de télémétrie (données du jeu)
-- [ ] Choix de la techno d'affichage (overlay web, SimHub, etc.)
-- [ ] Prototype du HUD (vitesse, compteur, mini-carte, temps au tour)
-- [ ] Tests en conditions réelles
+- La pression des pneus n'existe pas dans le paquet FH6.
+- Le HTTP n'est pas authentifié : à réserver à un réseau local de confiance.
+- Le dashboard doit rester visible pour un rendu fluide ; si la fenêtre est occultée
+  par le navigateur, une boucle de secours `setTimeout` prend le relais.
 
-## Conventions
+## Documentation
 
-- Langue du projet : français
-- La documentation Cristal se trouve dans `Documentation/`
-- Chaque grande étape fait l'objet d'un commit dédié
+- `Documentation/Créer un HUD pour FH6.md` : documentation officielle Data Out
+- `Documentation/References.md` : dépôts d'inspiration, licences et compatibilité FH6
+- `AGENTS.md` : cadrage du projet et conventions de travail

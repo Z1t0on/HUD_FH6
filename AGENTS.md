@@ -7,6 +7,11 @@ réalisé comme projet d'apprentissage d'OpenCode V2 desktop.
 Le HUD ne doit **jamais** modifier les fichiers du jeu ni lire sa RAM :
 la seule source de données est le flux officiel **Data Out** (UDP).
 
+Le HUD tourne sur un **second PC du réseau local** : le jeu envoie l'UDP à son IP,
+le serveur Node décode les paquets et les pousse au navigateur en SSE. L'affichage est
+un **dashboard plein écran** avec une mini-carte 3D Three.js (position X/Y/Z, altitude,
+caméra orbitale et suivi de la voiture), et non plus un overlay transparent pour OBS.
+
 ## Environnement
 
 - **OS** : Windows 11 (PowerShell ; préférer `Get-ChildItem` à `ls`, backtick pour les retours à ligne)
@@ -39,13 +44,37 @@ le code AGPL (RaceIQ) ne doit **jamais** être recopié (licence virale).
 - FH6 ajoute `CarGroup`, `SmashableVelDiff`, `SmashableMass` (après `NumCylinders`),
   et n'a ni `TireWear` ni `TrackOrdinal` (contrairement à Forza Motorsport)
 
+## Architecture et commandes
+
+- **Serveur** : Node.js + TypeScript (`src/server.ts`), UDP `0.0.0.0:9999`, HTTP `:3000`
+- **Décodage** : `src/telemetry/decode.ts` (paquet 324 o) + `src/telemetry/udp.ts`
+- **Transport navigateur** : SSE `/events` (60 Hz), état via `/health`
+- **Frontend** : `public/` en modules ES natifs, import map Three.js
+- **Three.js** : servi depuis `node_modules/three` via `/vendor/build/*` et
+  `/vendor/addons/*` ; aucun bundler, ne pas déplacer ces routes sans mettre à jour
+  l'import map de `public/index.html`
+- **Simulateur** : `tools/simulate.ts`, envoie 60 paquets/s à `127.0.0.1:9999`
+
+| Commande        | Rôle                                |
+| --------------- | ----------------------------------- |
+| `npm run dev`   | serveur en mode watch               |
+| `npm run build` | compilation TypeScript vers `dist/` |
+| `npm start`     | serveur compilé                     |
+| `npm test`      | tests du décodeur                   |
+| `npm run sim`   | simulateur de flux à 60 Hz          |
+
 ## Structure
 
 ```
 HUD_FH6/
 ├── AGENTS.md          # Ce fichier (cadrage des agents)
-├── Documentation/     # Doc Data Out officielle
-├── src/               # Code source du HUD
+├── Documentation/     # Doc Data Out officielle et références
+├── public/            # Dashboard : index.html, style.css, hud.js
+├── src/
+│   ├── server.ts      # HTTP + SSE + service des fichiers/vendor
+│   └── telemetry/     # decode.ts, udp.ts
+├── test/              # Tests du décodeur
+├── tools/             # simulate.ts
 ├── assets/            # Polices, images, icônes
 └── README.md          # Présentation publique du dépôt
 ```
@@ -54,10 +83,23 @@ HUD_FH6/
 
 - [x] Initialisation du dossier, premier commit, push GitHub (branche `main`)
 - [x] Documentation Data Out intégrée à `Documentation/`
-- [ ] Choix de la techno (prototype envisagé : Python `socket` + `struct`, ou web overlay)
-- [ ] Décodeur du paquet 324 octets
-- [ ] Rendu du HUD
-- [ ] Tests en conditions réelles
+- [x] Choix de la techno : serveur Node/TypeScript + dashboard navigateur + Three.js
+- [x] Décodeur du paquet 324 octets (5 tests unitaires)
+- [x] Rendu du HUD (instruments, carte 3D) et simulateur de flux
+- [x] Architecture « second PC » documentée (UDP LAN, pare-feu, ports)
+- [ ] Tests en conditions réelles avec FH6
+
+## Notes techniques
+
+- Le dashboard est un fichier JS unique (`public/hud.js`) sans bundler ; la carte 3D
+  utilise Three.js chargé depuis `node_modules` via l'import map.
+- `public/hud.js` bascule sur une boucle `setTimeout` si `requestAnimationFrame` est
+  gelé (fenêtre occultée) ; l'URL `?debug=1` expose `window.__hud` pour l'inspection.
+- La pression des pneus n'est pas dans le paquet FH6 : afficher « Pression n/d »,
+  ne jamais inventer de valeur.
+- Le serveur HTTP n'a pas d'authentification : le réserver à un réseau local de confiance.
+- Le tracé 3D ne contient que le trajet parcouru depuis l'ouverture du dashboard
+  (buffer glissant de 40 000 points).
 
 ## Attendus envers les agents
 
