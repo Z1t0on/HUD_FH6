@@ -22,7 +22,13 @@ la seule source de données est le flux officiel **Data Out** (UDP).
 
 ## Source de vérité technique
 
-`Documentation/Créer un HUD pour FH6.md` présente la doc officielle **Data Out** :
+`Documentation/Créer un HUD pour FH6.md` présente la doc officielle **Data Out**.
+
+`Documentation/References.md` recense les dépôts open-source d'inspiration, leurs licences
+et la compatibilité vérifiée : **le format FH6 (324 o) est identique au format v2 FH4/FH5**,
+les 3 champs FH6 (`CarGroup`, `SmashableVelDiff`, `SmashableMass`) occupant les offsets
+232, 236 et 240. Le code MIT (austinbaccus, csutorasa) est réutilisable avec attribution ;
+le code AGPL (RaceIQ) ne doit **jamais** être recopié (licence virale).
 
 - Paquet **UDP unique de 324 octets**, en **Little-Endian**, format « Dash » d'Horizon
 - Envoyé à l'IP/port configurés dans le jeu (Paramètres > ATH et gameplay > Data Out),
