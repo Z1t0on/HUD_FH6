@@ -53,6 +53,48 @@ const clearTrailButton = $("clear-trail");
 const fullscreenButton = $("fullscreen");
 const udpInfo = $("udp-info");
 
+const sessionsButton = $("sessions-open");
+const sessionsCountEl = $("sessions-count");
+const sessionsModal = $("sessions-modal");
+const sessionsListEl = $("session-list");
+const sessionsSummaryEl = $("sessions-summary");
+const sessionsCloseButton = $("sessions-close");
+const sessionsRefreshButton = $("sessions-refresh");
+const mapSubEl = $("map-sub");
+const lapLegendEl = $("lap-legend");
+const analysisBar = $("analysis-bar");
+const analysisExitButton = $("analysis-exit");
+const analysisTitleEl = $("analysis-title");
+const analysisRange = $("analysis-time");
+const analysisClockEl = $("analysis-clock");
+const inspectorEl = $("inspector");
+const toastEl = $("toast");
+
+const inspectorEls = {
+  lap: $("inspector-lap"),
+  laptime: $("inspector-laptime"),
+  speed: $("inspector-speed"),
+  gear: $("inspector-gear"),
+  rpm: $("inspector-rpm"),
+  throttle: $("inspector-throttle"),
+  brake: $("inspector-brake"),
+  clutch: $("inspector-clutch"),
+  steer: $("inspector-steer"),
+  gx: $("inspector-gx"),
+  gz: $("inspector-gz"),
+  alt: $("inspector-alt"),
+  x: $("inspector-x"),
+  z: $("inspector-z"),
+  position: $("inspector-position"),
+  clock: $("inspector-clock"),
+  tires: {
+    frontLeft: $("inspector-tire-fl"),
+    frontRight: $("inspector-tire-fr"),
+    rearLeft: $("inspector-tire-rl"),
+    rearRight: $("inspector-tire-rr"),
+  },
+};
+
 const tireEls = {
   frontLeft: $("tire-fl"),
   frontRight: $("tire-fr"),
@@ -68,9 +110,24 @@ const SHIFT_THRESHOLD = 0.94;
 const G_SCALE = 2.5;
 const G_HISTORY_SECONDS = 2.2;
 
-const TRACK_CAPACITY = 40000;
+const TRACK_CAPACITY = 60000;
 const TRACK_MIN_DISTANCE = 1.2;
 const TRACK_TELEPORT_DISTANCE = 800;
+const TRACK_MAX_SEGMENT = 80;
+
+const LAP_PALETTE = [
+  "#00e5ff",
+  "#2ee6a8",
+  "#ffb020",
+  "#ff4d9d",
+  "#a06cff",
+  "#ff8a3d",
+  "#7dd3fc",
+  "#e6ff3b",
+  "#ff5c5c",
+  "#9dffb0",
+];
+const LAP_COLORS = LAP_PALETTE.map((hex) => new THREE.Color(hex));
 
 const TIRE_COLORS = {
   cold: "#38bdf8",
@@ -88,11 +145,21 @@ let hasReceivedData = false;
 const smoothed = { speed: 0, initialized: false };
 const gHistory = [];
 
-let trackPoints = [];
-let trackCount = 0;
-let trackBuffer = null;
-let trackAttribute = null;
-let trackGeometry = null;
+const live = {
+  points: [],
+  pointCount: 0,
+  segmentCount: 0,
+  pointPositions: new Float32Array(TRACK_CAPACITY * 3),
+  pointColors: new Float32Array(TRACK_CAPACITY * 3),
+  segmentPositions: new Float32Array(TRACK_CAPACITY * 2 * 3),
+  segmentColors: new Float32Array(TRACK_CAPACITY * 2 * 3),
+};
+let liveLaps = [];
+let lastLiveLap = null;
+
+let mode = "live";
+let analysis = null;
+let sessions = [];
 
 let followCar = true;
 let currentHeading = 0;
@@ -105,6 +172,13 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 function formatLap(seconds) {
   if (!Number.isFinite(seconds) || seconds <= 0) return "--:--.---";
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds - minutes * 60;
+  return `${minutes}:${rest.toFixed(3).padStart(6, "0")}`;
+}
+
+function formatClock(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00.000";
   const minutes = Math.floor(seconds / 60);
   const rest = seconds - minutes * 60;
   return `${minutes}:${rest.toFixed(3).padStart(6, "0")}`;
@@ -130,6 +204,38 @@ function lerpAngle(from, to, amount) {
   let delta = ((to - from + Math.PI) % (Math.PI * 2)) - Math.PI;
   if (delta < -Math.PI) delta += Math.PI * 2;
   return from + delta * amount;
+}
+
+function lapColorIndex(lapNumber) {
+  const length = LAP_PALETTE.length;
+  return ((Math.trunc(lapNumber) % length) + length) % length;
+}
+
+function lapColorHex(lapNumber) {
+  return LAP_PALETTE[lapColorIndex(lapNumber)];
+}
+
+function lapColorRgb(lapNumber) {
+  return LAP_COLORS[lapColorIndex(lapNumber)];
+}
+
+function formatDistance(meters) {
+  if (!Number.isFinite(meters) || meters <= 0) return "—";
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 Mo";
+  const megabytes = bytes / (1024 * 1024);
+  return `${megabytes < 10 ? megabytes.toFixed(1) : Math.round(megabytes)} Mo`;
+}
+
+function formatDateTime(epochMs) {
+  if (!Number.isFinite(epochMs)) return "—";
+  return new Date(epochMs).toLocaleString("fr-FR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 }
 
 /* ------------------------------- Three.js */
@@ -184,13 +290,6 @@ scene.add(grid);
 
 /* ----- Piste : ligne lumineuse construite au fil des paquets */
 
-trackBuffer = new Float32Array(TRACK_CAPACITY * 3);
-trackGeometry = new THREE.BufferGeometry();
-trackAttribute = new THREE.BufferAttribute(trackBuffer, 3);
-trackAttribute.setUsage(THREE.DynamicDrawUsage);
-trackGeometry.setAttribute("position", trackAttribute);
-trackGeometry.setDrawRange(0, 0);
-
 function makeDotTexture() {
   const size = 64;
   const dotCanvas = document.createElement("canvas");
@@ -208,12 +307,34 @@ function makeDotTexture() {
   return texture;
 }
 
+const livePointGeometry = new THREE.BufferGeometry();
+const livePointPositionAttribute = new THREE.BufferAttribute(live.pointPositions, 3);
+livePointPositionAttribute.setUsage(THREE.DynamicDrawUsage);
+const livePointColorAttribute = new THREE.BufferAttribute(live.pointColors, 3);
+livePointColorAttribute.setUsage(THREE.DynamicDrawUsage);
+livePointGeometry.setAttribute("position", livePointPositionAttribute);
+livePointGeometry.setAttribute("color", livePointColorAttribute);
+livePointGeometry.setDrawRange(0, 0);
+
+const liveSegmentGeometry = new THREE.BufferGeometry();
+const liveSegmentPositionAttribute = new THREE.BufferAttribute(live.segmentPositions, 3);
+liveSegmentPositionAttribute.setUsage(THREE.DynamicDrawUsage);
+const liveSegmentColorAttribute = new THREE.BufferAttribute(live.segmentColors, 3);
+liveSegmentColorAttribute.setUsage(THREE.DynamicDrawUsage);
+liveSegmentGeometry.setAttribute("position", liveSegmentPositionAttribute);
+liveSegmentGeometry.setAttribute("color", liveSegmentColorAttribute);
+liveSegmentGeometry.setDrawRange(0, 0);
+
+const liveTrailGroup = new THREE.Group();
+scene.add(liveTrailGroup);
+
 const trailGlow = new THREE.Points(
-  trackGeometry,
+  livePointGeometry,
   new THREE.PointsMaterial({
     map: makeDotTexture(),
-    color: 0x00e5ff,
+    color: 0xffffff,
     size: 6,
+    vertexColors: true,
     transparent: true,
     opacity: 0.55,
     blending: THREE.AdditiveBlending,
@@ -223,16 +344,17 @@ const trailGlow = new THREE.Points(
   }),
 );
 trailGlow.frustumCulled = false;
-scene.add(trailGlow);
+liveTrailGroup.add(trailGlow);
 
 const trailHalo = new THREE.Points(
-  trackGeometry,
+  livePointGeometry,
   new THREE.PointsMaterial({
     map: makeDotTexture(),
-    color: 0x00a8ff,
+    color: 0xffffff,
     size: 11,
+    vertexColors: true,
     transparent: true,
-    opacity: 0.12,
+    opacity: 0.13,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     sizeAttenuation: true,
@@ -240,21 +362,22 @@ const trailHalo = new THREE.Points(
   }),
 );
 trailHalo.frustumCulled = false;
-scene.add(trailHalo);
+liveTrailGroup.add(trailHalo);
 
-const trackLine = new THREE.Line(
-  trackGeometry,
+const trackLine = new THREE.LineSegments(
+  liveSegmentGeometry,
   new THREE.LineBasicMaterial({
-    color: 0x9bf6ff,
+    color: 0xffffff,
+    vertexColors: true,
     transparent: true,
-    opacity: 0.4,
+    opacity: 0.62,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false,
   }),
 );
 trackLine.frustumCulled = false;
-scene.add(trackLine);
+liveTrailGroup.add(trackLine);
 
 /* ----- Repère de départ */
 
@@ -374,61 +497,117 @@ scene.add(groundMark);
 
 /* ------------------------------- Gestion du tracé */
 
-function pushTrackPoint(x, y, z) {
-  const last = trackPoints[trackPoints.length - 1];
+function addLivePoint(x, y, z, lap) {
+  const index = live.pointCount;
+  const base = index * 3;
+  const color = lapColorRgb(lap);
+
+  live.pointPositions[base] = x;
+  live.pointPositions[base + 1] = y + 0.6;
+  live.pointPositions[base + 2] = z;
+  live.pointColors[base] = color.r;
+  live.pointColors[base + 1] = color.g;
+  live.pointColors[base + 2] = color.b;
+
+  live.points.push({ x, y, z, lap });
+  live.pointCount += 1;
+
+  livePointGeometry.setDrawRange(0, live.pointCount);
+  livePointPositionAttribute.needsUpdate = true;
+  livePointColorAttribute.needsUpdate = true;
+}
+
+function addLiveSegment(from, to, color) {
+  if (live.segmentCount >= TRACK_CAPACITY) return;
+  const base = live.segmentCount * 6;
+
+  live.segmentPositions[base] = from.x;
+  live.segmentPositions[base + 1] = from.y + 0.6;
+  live.segmentPositions[base + 2] = from.z;
+  live.segmentPositions[base + 3] = to.x;
+  live.segmentPositions[base + 4] = to.y + 0.6;
+  live.segmentPositions[base + 5] = to.z;
+
+  for (let vertex = 0; vertex < 2; vertex += 1) {
+    const offset = base + vertex * 3;
+    live.segmentColors[offset] = color.r;
+    live.segmentColors[offset + 1] = color.g;
+    live.segmentColors[offset + 2] = color.b;
+  }
+
+  live.segmentCount += 1;
+  liveSegmentGeometry.setDrawRange(0, live.segmentCount * 2);
+  liveSegmentPositionAttribute.needsUpdate = true;
+  liveSegmentColorAttribute.needsUpdate = true;
+}
+
+function pushTrackPoint(telemetry) {
+  const { x, y, z } = telemetry.position;
+  const lap = telemetry.lapNumber;
+  const last = live.points[live.points.length - 1];
+
   if (last) {
-    const distance = Math.hypot(x - last.x, y - last.y, z - last.z);
-    if (distance < TRACK_MIN_DISTANCE) return;
-    if (distance > TRACK_TELEPORT_DISTANCE) {
+    const step = Math.hypot(x - last.x, y - last.y, z - last.z);
+    if (step < TRACK_MIN_DISTANCE) return;
+    if (step > TRACK_TELEPORT_DISTANCE) {
       clearTrail();
+    } else if (step <= TRACK_MAX_SEGMENT) {
+      addLiveSegment(last, { x, y, z }, lapColorRgb(last.lap));
     }
   }
 
-  if (trackCount >= TRACK_CAPACITY) {
-    // On conserve la seconde moitié du tracé et on libère de la place
-    const keep = Math.floor(TRACK_CAPACITY / 2);
-    trackPoints = trackPoints.slice(-keep);
-    trackCount = trackPoints.length;
-    for (let i = 0; i < trackCount; i += 1) {
-      const point = trackPoints[i];
-      trackBuffer[i * 3] = point.x;
-      trackBuffer[i * 3 + 1] = point.y + 0.6;
-      trackBuffer[i * 3 + 2] = point.z;
-    }
+  if (live.pointCount >= TRACK_CAPACITY) {
+    // Le tracé direct est un affichage : l'archive serveur reste complète.
+    clearTrail();
   }
 
-  trackPoints.push({ x, y, z });
-  const index = trackCount;
-  trackBuffer[index * 3] = x;
-  trackBuffer[index * 3 + 1] = y + 0.6;
-  trackBuffer[index * 3 + 2] = z;
-  trackCount += 1;
+  addLivePoint(x, y, z, lap);
 
-  if (trackCount === 1) {
+  if (live.pointCount === 1) {
     startRing.position.set(x, y + 0.6, z);
     startRing.visible = true;
   }
 
-  trackGeometry.setDrawRange(0, trackCount);
-  trackAttribute.needsUpdate = true;
+  if (lastLiveLap === null) {
+    lastLiveLap = lap;
+  } else if (lap !== lastLiveLap) {
+    liveLaps.push({
+      index: lastLiveLap,
+      number: lastLiveLap + 1,
+      time: telemetry.lastLap,
+      complete: telemetry.lastLap > 0,
+      startSample: 0,
+      endSample: 0,
+    });
+    lastLiveLap = lap;
+    if (mode === "live") renderLapLegend(liveLaps, false);
+  }
 }
 
 function clearTrail() {
-  trackPoints = [];
-  trackCount = 0;
-  trackGeometry.setDrawRange(0, 0);
-  trackAttribute.needsUpdate = true;
+  live.points = [];
+  live.pointCount = 0;
+  live.segmentCount = 0;
+  livePointGeometry.setDrawRange(0, 0);
+  liveSegmentGeometry.setDrawRange(0, 0);
+  livePointPositionAttribute.needsUpdate = true;
+  livePointColorAttribute.needsUpdate = true;
+  liveSegmentPositionAttribute.needsUpdate = true;
+  liveSegmentColorAttribute.needsUpdate = true;
   startRing.visible = false;
+  liveLaps = [];
+  lastLiveLap = null;
+  if (mode === "live") renderLapLegend([], false);
 }
 
-function updateAltitudeLine(x, y, z) {
+function updateAltitudeLine(x, y, z, visible = live.pointCount > 0) {
   const positions = altitudeGeometry.getAttribute("position");
   positions.setXYZ(0, x, 0.2, z);
   positions.setXYZ(1, x, Math.max(y, 0.6), z);
   positions.needsUpdate = true;
 
   groundMark.position.set(x, 0.25, z);
-  groundMark.visible = trackCount > 0;
+  groundMark.visible = visible;
 }
 
 /* ------------------------------- Caméra */
@@ -458,17 +637,12 @@ function setFollow(enabled) {
   }
 }
 
-function fitTrail() {
-  if (trackCount < 2) {
-    setFollow(true);
-    snapCameraToCar();
-    return;
-  }
+function fitPoints(points) {
+  if (points.length < 2) return false;
 
-  setFollow(false);
   const box = new THREE.Box3();
   const point = new THREE.Vector3();
-  for (const entry of trackPoints) {
+  for (const entry of points) {
     box.expandByPoint(point.set(entry.x, entry.y, entry.z));
   }
   const center = box.getCenter(new THREE.Vector3());
@@ -483,6 +657,24 @@ function fitTrail() {
   controls.target.copy(center);
   camera.position.copy(center).add(direction.multiplyScalar(distance));
   controls.update();
+  return true;
+}
+
+function fitTrail() {
+  if (mode === "analysis" && analysis) {
+    setFollow(false);
+    fitPoints(analysis.trailPoints);
+    return;
+  }
+
+  if (live.pointCount < 2) {
+    setFollow(true);
+    snapCameraToCar();
+    return;
+  }
+
+  setFollow(false);
+  fitPoints(live.points);
 }
 
 followToggle.addEventListener("click", () => setFollow(!followCar));
@@ -514,24 +706,27 @@ function updateTelemetry(telemetry) {
   lastPacketAt = performance.now();
   hasReceivedData = true;
 
-  // Piste 3D
+  // Piste 3D : alimentée même en mode analyse pour retrouver le direct au retour.
   const position = telemetry.position;
   if (Number.isFinite(position.x) && Number.isFinite(position.y) && Number.isFinite(position.z)) {
-    pushTrackPoint(position.x, position.y, position.z);
-    targetCarPosition.set(position.x, Math.max(position.y, 0) + 2.5, position.z);
+    pushTrackPoint(telemetry);
 
-    const last = trackPoints[trackPoints.length - 2] ?? trackPoints[trackPoints.length - 1];
-    if (last && telemetry.speed > 3) {
-      const dx = position.x - last.x;
-      const dz = position.z - last.z;
-      if (Math.hypot(dx, dz) > 0.2) {
-        targetHeading = Math.atan2(dx, dz);
+    if (mode === "live") {
+      targetCarPosition.set(position.x, Math.max(position.y, 0) + 2.5, position.z);
+
+      const last = live.points[live.points.length - 2] ?? live.points[live.points.length - 1];
+      if (last && telemetry.speed > 3) {
+        const dx = position.x - last.x;
+        const dz = position.z - last.z;
+        if (Math.hypot(dx, dz) > 0.2) {
+          targetHeading = Math.atan2(dx, dz);
+        }
       }
-    }
 
-    altitudeEl.textContent = position.y.toFixed(0);
-    posXEl.textContent = position.x.toFixed(0);
-    posZEl.textContent = position.z.toFixed(0);
+      altitudeEl.textContent = position.y.toFixed(0);
+      posXEl.textContent = position.x.toFixed(0);
+      posZEl.textContent = position.z.toFixed(0);
+    }
   }
 
   // G-force : historique
@@ -543,7 +738,7 @@ function updateTelemetry(telemetry) {
     gHistory.shift();
   }
 
-  if (isFirstPacket) {
+  if (isFirstPacket && mode === "live") {
     snapCameraToCar();
   }
 }
@@ -570,7 +765,7 @@ function sizeCanvas(canvasEl, ctx) {
   return { width: rect.width, height: rect.height };
 }
 
-function drawGForce() {
+function drawGForce(current, trail) {
   const { width, height } = sizeCanvas(gforceCanvas, gforceCtx);
   const ctx = gforceCtx;
   ctx.clearRect(0, 0, width, height);
@@ -596,28 +791,24 @@ function drawGForce() {
   ctx.stroke();
   ctx.restore();
 
-  if (!latest) return;
+  if (!current) return;
 
-  const now = performance.now();
-  for (let i = 1; i < gHistory.length; i += 1) {
-    const previous = gHistory[i - 1];
-    const point = gHistory[i];
-    const age = now - point.t;
-    const alpha = clamp(1 - age / (G_HISTORY_SECONDS * 1000), 0, 1) * 0.65;
-    if (alpha <= 0) continue;
-    ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
+  for (const segment of trail) {
+    if (segment.alpha <= 0) continue;
+    ctx.strokeStyle = `rgba(0, 229, 255, ${segment.alpha})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(cx + (previous.gx / G_SCALE) * radius, cy - (previous.gz / G_SCALE) * radius);
-    ctx.lineTo(cx + (point.gx / G_SCALE) * radius, cy - (point.gz / G_SCALE) * radius);
+    ctx.moveTo(
+      cx + (segment.from.gx / G_SCALE) * radius,
+      cy - (segment.from.gz / G_SCALE) * radius,
+    );
+    ctx.lineTo(cx + (segment.to.gx / G_SCALE) * radius, cy - (segment.to.gz / G_SCALE) * radius);
     ctx.stroke();
   }
 
-  const gx = latest.acceleration.x / 9.81;
-  const gz = latest.acceleration.z / 9.81;
-  const magnitude = Math.hypot(gx, gz);
-  const dotX = cx + clamp(gx / G_SCALE, -1, 1) * radius;
-  const dotY = cy - clamp(gz / G_SCALE, -1, 1) * radius;
+  const magnitude = Math.hypot(current.gx, current.gz);
+  const dotX = cx + clamp(current.gx / G_SCALE, -1, 1) * radius;
+  const dotY = cy - clamp(current.gz / G_SCALE, -1, 1) * radius;
 
   ctx.save();
   ctx.shadowColor = magnitude > 1.8 ? TIRE_COLORS.overheat : TIRE_COLORS.ideal;
@@ -631,6 +822,24 @@ function drawGForce() {
   gforceReadout.textContent = `${magnitude.toFixed(2)} g`;
   gforceReadout.style.color =
     magnitude > 1.8 ? TIRE_COLORS.overheat : magnitude > 1.2 ? "#ffb020" : "#7f8ea3";
+}
+
+function liveGForceTrail() {
+  const now = performance.now();
+  const trail = [];
+  for (let i = 1; i < gHistory.length; i += 1) {
+    const previous = gHistory[i - 1];
+    const point = gHistory[i];
+    if (!previous || !point) continue;
+    const alpha = clamp(1 - (now - point.t) / (G_HISTORY_SECONDS * 1000), 0, 1) * 0.65;
+    if (alpha > 0) trail.push({ from: previous, to: point, alpha });
+  }
+  return trail;
+}
+
+function liveGForceCurrent() {
+  if (!latest) return null;
+  return { gx: latest.acceleration.x / 9.81, gz: latest.acceleration.z / 9.81 };
 }
 
 function renderInstruments(telemetry) {
@@ -709,6 +918,656 @@ function renderInstruments(telemetry) {
   }
 }
 
+/* ------------------------------- Sessions enregistrées */
+
+let toastTimer = 0;
+
+function showToast(message) {
+  toastEl.textContent = message;
+  toastEl.classList.add("is-visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("is-visible"), 4200);
+}
+
+function renderLapLegend(laps, interactive) {
+  lapLegendEl.replaceChildren();
+
+  for (const lap of laps) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "lap-chip";
+    chip.style.setProperty("--lap-color", lapColorHex(lap.index));
+    chip.title = `Tour ${lap.number}${lap.time > 0 ? ` — ${formatLap(lap.time)}` : ""}`;
+
+    const dot = document.createElement("i");
+    const label = document.createElement("span");
+    label.textContent = `T${lap.number}`;
+    const time = document.createElement("b");
+    time.textContent = lap.complete && lap.time > 0 ? formatLap(lap.time) : "…";
+    chip.append(dot, label, time);
+
+    if (interactive) {
+      chip.classList.add("is-interactive");
+      chip.addEventListener("click", () => {
+        if (!analysis) return;
+        const index = Math.max(0, Math.min(lap.startSample, analysis.session.count - 1));
+        selectSample(index);
+      });
+    }
+
+    lapLegendEl.appendChild(chip);
+  }
+}
+
+function makeStat(label, value) {
+  const span = document.createElement("span");
+  span.append(`${label} `);
+  const strong = document.createElement("b");
+  strong.textContent = value;
+  span.appendChild(strong);
+  return span;
+}
+
+function sessionRow(meta) {
+  const row = document.createElement("div");
+  row.className = "session-row";
+
+  const main = document.createElement("div");
+  main.className = "session-main";
+
+  const date = document.createElement("span");
+  date.className = "session-date";
+  date.textContent = formatDateTime(meta.startedAt);
+
+  const kind = document.createElement("span");
+  kind.className = "session-kind";
+  kind.textContent =
+    meta.kind === "race"
+      ? `Course · ${meta.lapCount} ${meta.lapCount > 1 ? "tours" : "tour"}`
+      : "Balade libre";
+
+  const laps = document.createElement("div");
+  laps.className = "session-laps";
+  for (const lap of meta.laps ?? []) {
+    const stripe = document.createElement("i");
+    stripe.style.setProperty("--lap-color", lapColorHex(lap.index));
+    stripe.title = `Tour ${lap.number}${lap.time > 0 ? ` — ${formatLap(lap.time)}` : ""}`;
+    laps.appendChild(stripe);
+  }
+
+  main.append(date, kind, laps);
+
+  const stats = document.createElement("div");
+  stats.className = "session-stats";
+  stats.append(
+    makeStat("Durée", formatLap(meta.duration)),
+    makeStat("Meilleur", meta.bestLap > 0 ? formatLap(meta.bestLap) : "—"),
+    makeStat("Distance", formatDistance(meta.distance)),
+    makeStat("V. max", `${Math.round(meta.maxSpeed * 3.6)} km/h`),
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "session-actions";
+
+  const analyzeButton = document.createElement("button");
+  analyzeButton.type = "button";
+  analyzeButton.className = "btn";
+  analyzeButton.dataset.action = "analyze";
+  analyzeButton.dataset.id = meta.id;
+  analyzeButton.textContent = "Analyser";
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.className = "btn danger";
+  deleteButton.dataset.action = "delete";
+  deleteButton.dataset.id = meta.id;
+  deleteButton.textContent = "Supprimer";
+
+  actions.append(analyzeButton, deleteButton);
+  row.append(main, stats, actions);
+  return row;
+}
+
+function renderSessionList(data) {
+  const list = data?.sessions ?? sessions;
+  sessionsListEl.replaceChildren();
+
+  if (!list.length) {
+    const empty = document.createElement("p");
+    empty.className = "session-empty";
+    empty.textContent =
+      "Aucune session enregistrée pour l'instant. Roulez : l'enregistrement est automatique.";
+    sessionsListEl.appendChild(empty);
+    sessionsSummaryEl.textContent = "0 session";
+    return;
+  }
+
+  const totalBytes = data?.totalBytes ?? list.reduce((sum, meta) => sum + (meta.bytes || 0), 0);
+  const keep = data?.keep ?? 40;
+  sessionsSummaryEl.textContent = `${list.length} session(s) · ${formatBytes(totalBytes)} · conservation : ${keep} max`;
+
+  for (const meta of list) {
+    sessionsListEl.appendChild(sessionRow(meta));
+  }
+}
+
+async function refreshSessions({ render = true } = {}) {
+  try {
+    const response = await fetch("/sessions", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    sessionsCountEl.textContent = String(sessions.length);
+    if (render) renderSessionList(data);
+    return data;
+  } catch (error) {
+    console.warn("Liste des sessions indisponible :", error);
+    if (render) {
+      sessionsListEl.replaceChildren();
+      const empty = document.createElement("p");
+      empty.className = "session-empty";
+      empty.textContent = "Impossible de charger les sessions : serveur injoignable.";
+      sessionsListEl.appendChild(empty);
+      sessionsSummaryEl.textContent = "Serveur injoignable";
+    }
+    return null;
+  }
+}
+
+function openSessions() {
+  sessionsModal.hidden = false;
+  refreshSessions();
+}
+
+function closeSessions() {
+  sessionsModal.hidden = true;
+}
+
+async function deleteSession(id) {
+  if (!window.confirm("Supprimer définitivement cette session enregistrée ?")) return;
+  try {
+    const response = await fetch(`/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!response.ok && response.status !== 404) throw new Error(`HTTP ${response.status}`);
+    if (analysis?.meta.id === id) exitAnalysis();
+    await refreshSessions();
+    showToast("Session supprimée");
+  } catch (error) {
+    console.warn("Suppression impossible :", error);
+    showToast("Suppression impossible");
+  }
+}
+
+sessionsButton.addEventListener("click", openSessions);
+sessionsCloseButton.addEventListener("click", closeSessions);
+sessionsRefreshButton.addEventListener("click", () => refreshSessions());
+sessionsModal.addEventListener("click", (event) => {
+  if (event.target === sessionsModal) closeSessions();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !sessionsModal.hidden) closeSessions();
+});
+sessionsListEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const id = button.dataset.id;
+  if (!id) return;
+  if (button.dataset.action === "analyze") {
+    closeSessions();
+    loadSession(id);
+  } else if (button.dataset.action === "delete") {
+    deleteSession(id);
+  }
+});
+
+/* ------------------------------- Analyse d'une session */
+
+const archiveGroup = new THREE.Group();
+archiveGroup.visible = false;
+scene.add(archiveGroup);
+
+let analysisPreviousFollow = true;
+
+function sampleValue(session, sample, key) {
+  const index = session.fieldIndex.get(key);
+  if (index === undefined) return 0;
+  return session.data[sample * session.stride + index] ?? 0;
+}
+
+function parseSessionPayload(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length < 12) throw new Error("Charge utile trop courte");
+  if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== "FH6S") {
+    throw new Error("Format de session inconnu");
+  }
+
+  const view = new DataView(buffer);
+  const headerLength = view.getUint32(4, true);
+  const headerEnd = 8 + headerLength;
+  if (headerEnd > bytes.length) throw new Error("En-tête tronqué");
+
+  const header = JSON.parse(new TextDecoder().decode(bytes.subarray(8, headerEnd)).trim());
+  const dataOffset = headerEnd;
+  if (dataOffset % 4 !== 0) throw new Error("Colonnes non alignées");
+
+  const expected = header.count * header.stride;
+  if (dataOffset + expected * 4 > bytes.length) throw new Error("Colonnes tronquées");
+
+  const data = new Float32Array(buffer, dataOffset, expected);
+  const fieldIndex = new Map();
+  header.fields.forEach((field, index) => fieldIndex.set(field.key, index));
+
+  return {
+    meta: header.meta,
+    header,
+    count: header.count,
+    stride: header.stride,
+    data,
+    fieldIndex,
+    trailPoints: [],
+    sampleIndex: 0,
+  };
+}
+
+function disposeArchive() {
+  for (const child of archiveGroup.children) {
+    child.geometry?.dispose?.();
+    if (Array.isArray(child.material)) {
+      for (const material of child.material) material.dispose?.();
+    } else {
+      child.material?.dispose?.();
+    }
+  }
+  archiveGroup.clear();
+  archiveGroup.visible = false;
+}
+
+function buildArchiveTrail(session) {
+  disposeArchive();
+  session.trailPoints = [];
+
+  const stride = session.stride;
+  const count = session.count;
+  const xIndex = session.fieldIndex.get("x") ?? -1;
+  const yIndex = session.fieldIndex.get("y") ?? -1;
+  const zIndex = session.fieldIndex.get("z") ?? -1;
+  const lapIndex = session.fieldIndex.get("lapNumber") ?? -1;
+  if (xIndex < 0 || yIndex < 0 || zIndex < 0 || lapIndex < 0) {
+    throw new Error("Colonnes de position absentes");
+  }
+
+  const pointPositions = new Float32Array(count * 3);
+  const pointColors = new Float32Array(count * 3);
+  const segmentPositions = new Float32Array(count * 6);
+  const segmentColors = new Float32Array(count * 6);
+  let pointCount = 0;
+  let segmentCount = 0;
+  let last = null;
+
+  for (let sample = 0; sample < count; sample += 1) {
+    const x = session.data[sample * stride + xIndex];
+    const y = session.data[sample * stride + yIndex];
+    const z = session.data[sample * stride + zIndex];
+    const lap = session.data[sample * stride + lapIndex];
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+
+    if (last) {
+      const step = Math.hypot(x - last.x, y - last.y, z - last.z);
+      if (step < TRACK_MIN_DISTANCE) continue;
+      if (step <= TRACK_TELEPORT_DISTANCE) {
+        const base = segmentCount * 6;
+        const color = lapColorRgb(last.lap);
+        segmentPositions[base] = last.x;
+        segmentPositions[base + 1] = last.y + 0.6;
+        segmentPositions[base + 2] = last.z;
+        segmentPositions[base + 3] = x;
+        segmentPositions[base + 4] = y + 0.6;
+        segmentPositions[base + 5] = z;
+        for (let vertex = 0; vertex < 2; vertex += 1) {
+          const offset = base + vertex * 3;
+          segmentColors[offset] = color.r;
+          segmentColors[offset + 1] = color.g;
+          segmentColors[offset + 2] = color.b;
+        }
+        segmentCount += 1;
+      }
+    }
+
+    const color = lapColorRgb(lap);
+    pointPositions[pointCount * 3] = x;
+    pointPositions[pointCount * 3 + 1] = y + 0.6;
+    pointPositions[pointCount * 3 + 2] = z;
+    pointColors[pointCount * 3] = color.r;
+    pointColors[pointCount * 3 + 1] = color.g;
+    pointColors[pointCount * 3 + 2] = color.b;
+    session.trailPoints.push({ x, y, z, lap, sample });
+    pointCount += 1;
+    last = { x, y, z, lap };
+  }
+
+  const pointGeometry = new THREE.BufferGeometry();
+  pointGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(pointPositions.slice(0, pointCount * 3), 3),
+  );
+  pointGeometry.setAttribute(
+    "color",
+    new THREE.BufferAttribute(pointColors.slice(0, pointCount * 3), 3),
+  );
+
+  const segmentGeometry = new THREE.BufferGeometry();
+  segmentGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(segmentPositions.slice(0, segmentCount * 6), 3),
+  );
+  segmentGeometry.setAttribute(
+    "color",
+    new THREE.BufferAttribute(segmentColors.slice(0, segmentCount * 6), 3),
+  );
+
+  const points = new THREE.Points(
+    pointGeometry,
+    new THREE.PointsMaterial({
+      map: makeDotTexture(),
+      color: 0xffffff,
+      size: 5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+      toneMapped: false,
+    }),
+  );
+  points.frustumCulled = false;
+
+  const line = new THREE.LineSegments(
+    segmentGeometry,
+    new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
+  line.frustumCulled = false;
+
+  archiveGroup.add(points, line);
+  archiveGroup.visible = true;
+}
+
+async function loadSession(id) {
+  try {
+    const response = await fetch(`/sessions/${encodeURIComponent(id)}/data`, {
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const session = parseSessionPayload(await response.arrayBuffer());
+    enterAnalysis(session);
+  } catch (error) {
+    console.error("Chargement de la session impossible :", error);
+    showToast("Impossible de charger la session");
+  }
+}
+
+function enterAnalysis(session) {
+  if (analysis) exitAnalysis();
+
+  analysis = session;
+  mode = "analysis";
+  analysisPreviousFollow = followCar;
+
+  liveTrailGroup.visible = false;
+  startRing.visible = false;
+  archiveGroup.visible = true;
+  carGroup.visible = true;
+
+  buildArchiveTrail(session);
+
+  analysisBar.hidden = false;
+  analysisTitleEl.textContent =
+    session.meta.kind === "race"
+      ? `Course · ${session.meta.lapCount} ${session.meta.lapCount > 1 ? "tours" : "tour"} · ${formatClock(session.meta.duration)}`
+      : `Balade · ${formatClock(session.meta.duration)}`;
+  analysisRange.min = "0";
+  analysisRange.max = String(Math.max(0.001, session.meta.duration));
+  analysisRange.value = "0";
+  analysisClockEl.textContent = "0:00.000";
+  mapSubEl.textContent = "Session archivée · cliquez sur le tracé";
+  clearTrailButton.disabled = true;
+  inspectorEl.hidden = false;
+  app.classList.add("is-analysis");
+
+  setFollow(false);
+  fitPoints(session.trailPoints);
+  renderLapLegend(session.meta.laps ?? [], true);
+  selectSample(0);
+}
+
+function exitAnalysis() {
+  if (!analysis) return;
+
+  disposeArchive();
+  analysis = null;
+  mode = "live";
+
+  liveTrailGroup.visible = true;
+  startRing.visible = live.pointCount > 0;
+
+  analysisBar.hidden = true;
+  inspectorEl.hidden = true;
+  mapSubEl.textContent = "Position X / Y / Z en temps réel";
+  clearTrailButton.disabled = false;
+  app.classList.remove("is-analysis");
+  renderLapLegend(liveLaps, false);
+
+  setFollow(analysisPreviousFollow);
+  smoothed.initialized = false;
+
+  if (latest) {
+    const position = latest.position;
+    targetCarPosition.set(position.x, Math.max(position.y, 0) + 2.5, position.z);
+    carGroup.position.copy(targetCarPosition);
+  }
+
+  drawGForce(liveGForceCurrent(), liveGForceTrail());
+}
+
+function sampleIndexForTime(session, time) {
+  let low = 0;
+  let high = session.count - 1;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    const middleTime = session.data[middle * session.stride];
+    if (middleTime < time) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
+function sampleToTelemetry(session, sample) {
+  const get = (key) => sampleValue(session, sample, key);
+  return {
+    speed: get("speed"),
+    gear: get("gear"),
+    rpm: get("rpm"),
+    engineMaxRpm: get("engineMaxRpm"),
+    currentLap: get("lapTime"),
+    lastLap: get("lastLap"),
+    bestLap: get("bestLap"),
+    lapNumber: get("lapNumber"),
+    throttle: get("throttle"),
+    brake: get("brake"),
+    clutch: get("clutch"),
+    tireTemp: {
+      frontLeft: get("tireTempFL"),
+      frontRight: get("tireTempFR"),
+      rearLeft: get("tireTempRL"),
+      rearRight: get("tireTempRR"),
+    },
+    acceleration: { x: get("accelX"), y: get("accelY"), z: get("accelZ") },
+  };
+}
+
+function updateInspector(sample) {
+  if (!analysis) return;
+  const session = analysis;
+  const get = (key) => sampleValue(session, sample, key);
+
+  inspectorEls.lap.textContent = `TOUR ${get("lapNumber") + 1}`;
+  inspectorEls.laptime.textContent = formatLap(get("lapTime"));
+  inspectorEls.speed.textContent = String(Math.round(Math.max(0, get("speed")) * 3.6));
+  inspectorEls.gear.textContent = gearLabel(get("gear"));
+  inspectorEls.rpm.textContent = Math.round(get("rpm")).toLocaleString("fr-FR");
+
+  const throttle = get("throttle") / 255;
+  const brake = get("brake") / 255;
+  const clutch = get("clutch") / 255;
+  inspectorEls.throttle.textContent = `${Math.round(throttle * 100)}%`;
+  inspectorEls.brake.textContent = `${Math.round(brake * 100)}%`;
+  inspectorEls.clutch.textContent = `${Math.round(clutch * 100)}%`;
+  inspectorEls.steer.textContent = `${Math.round((get("steer") / 127) * 100)}%`;
+
+  const tires = [
+    ["frontLeft", "tireTempFL"],
+    ["frontRight", "tireTempFR"],
+    ["rearLeft", "tireTempRL"],
+    ["rearRight", "tireTempRR"],
+  ];
+  for (const [key, field] of tires) {
+    const element = inspectorEls.tires[key];
+    if (!element) continue;
+    const fahrenheit = get(field);
+    const value = element.querySelector("b");
+    if (!value) continue;
+    if (!fahrenheit || fahrenheit <= 0) {
+      element.dataset.state = "cold";
+      value.textContent = "—";
+      continue;
+    }
+    const celsius = fahrenheitToCelsius(fahrenheit);
+    element.dataset.state = tireState(celsius);
+    value.textContent = `${Math.round(celsius)}°C`;
+  }
+
+  inspectorEls.gx.textContent = (get("accelX") / 9.81).toFixed(2);
+  inspectorEls.gz.textContent = (get("accelZ") / 9.81).toFixed(2);
+  inspectorEls.alt.textContent = get("y").toFixed(0);
+  inspectorEls.x.textContent = get("x").toFixed(0);
+  inspectorEls.z.textContent = get("z").toFixed(0);
+  const position = get("racePosition");
+  inspectorEls.position.textContent = position > 0 ? `P${Math.round(position)}` : "—";
+
+  const raceTime = get("raceTime");
+  const sessionTime = get("time");
+  inspectorEls.clock.textContent = `Course ${raceTime > 0 ? formatLap(raceTime) : "—"} · ${formatClock(sessionTime)} de session`;
+}
+
+function selectSample(index) {
+  if (!analysis) return;
+  const session = analysis;
+  if (session.count === 0) return;
+  const sample = clamp(Math.round(index), 0, session.count - 1);
+  session.sampleIndex = sample;
+
+  const x = sampleValue(session, sample, "x");
+  const y = sampleValue(session, sample, "y");
+  const z = sampleValue(session, sample, "z");
+
+  targetCarPosition.set(x, Math.max(y, 0) + 2.5, z);
+  carGroup.position.copy(targetCarPosition);
+
+  const next = Math.min(sample + 1, session.count - 1);
+  const dx = sampleValue(session, next, "x") - x;
+  const dz = sampleValue(session, next, "z") - z;
+  if (Math.hypot(dx, dz) > 0.1) {
+    targetHeading = Math.atan2(dx, dz);
+    currentHeading = targetHeading;
+  }
+
+  updateAltitudeLine(x, y, z, true);
+  updateInspector(sample);
+
+  const time = session.data[sample * session.stride];
+  analysisRange.value = String(time);
+  analysisClockEl.textContent = formatClock(time);
+  smoothed.initialized = false;
+  smoothed.speed = sampleValue(session, sample, "speed");
+  renderInstruments(sampleToTelemetry(session, sample));
+}
+
+function analysisGForce() {
+  if (!analysis) return { current: null, trail: [] };
+  const session = analysis;
+  const sample = session.sampleIndex;
+  const g = (index) => ({
+    gx: sampleValue(session, index, "accelX") / 9.81,
+    gz: sampleValue(session, index, "accelZ") / 9.81,
+  });
+
+  const time = session.data[sample * session.stride];
+  let start = sample;
+  while (start > 0 && time - session.data[start * session.stride] < G_HISTORY_SECONDS) {
+    start -= 1;
+  }
+
+  const trail = [];
+  for (let index = start + 1; index <= sample; index += 1) {
+    const span = Math.max(1, sample - start);
+    const alpha = clamp(1 - (sample - index) / span, 0, 1) * 0.65;
+    trail.push({ from: g(index - 1), to: g(index), alpha });
+  }
+  return { current: g(sample), trail };
+}
+
+function pickArchiveSample(clientX, clientY) {
+  if (!analysis || mode !== "analysis") return;
+  const rect = canvas.getBoundingClientRect();
+  const projected = new THREE.Vector3();
+  let bestSample = -1;
+  let bestDistance = 18;
+
+  for (const entry of analysis.trailPoints) {
+    projected.set(entry.x, entry.y + 0.6, entry.z).project(camera);
+    if (projected.z > 1) continue;
+    const screenX = rect.left + ((projected.x + 1) / 2) * rect.width;
+    const screenY = rect.top + ((1 - projected.y) / 2) * rect.height;
+    const distance = Math.hypot(screenX - clientX, screenY - clientY);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestSample = entry.sample;
+    }
+  }
+
+  if (bestSample >= 0) selectSample(bestSample);
+}
+
+let pickStart = null;
+canvas.addEventListener("pointerdown", (event) => {
+  pickStart = { x: event.clientX, y: event.clientY, at: performance.now() };
+});
+canvas.addEventListener("pointerup", (event) => {
+  if (!pickStart) return;
+  const moved = Math.hypot(event.clientX - pickStart.x, event.clientY - pickStart.y);
+  const elapsed = performance.now() - pickStart.at;
+  pickStart = null;
+  if (mode === "analysis" && moved < 6 && elapsed < 600) {
+    pickArchiveSample(event.clientX, event.clientY);
+  }
+});
+canvas.addEventListener("pointerleave", () => {
+  pickStart = null;
+});
+
+analysisExitButton.addEventListener("click", () => exitAnalysis());
+analysisRange.addEventListener("input", () => {
+  if (!analysis) return;
+  selectSample(sampleIndexForTime(analysis, Number(analysisRange.value)));
+});
+
 /* ------------------------------- Scène : animation */
 
 function animateCarAndCamera() {
@@ -718,7 +1577,12 @@ function animateCarAndCamera() {
 
   glowSprite.position.set(0, 5, 0);
 
-  updateAltitudeLine(carGroup.position.x, carGroup.position.y, carGroup.position.z);
+  updateAltitudeLine(
+    carGroup.position.x,
+    carGroup.position.y,
+    carGroup.position.z,
+    mode === "analysis" ? true : live.pointCount > 0,
+  );
 
   if (followCar) {
     const offset = camera.position.clone().sub(controls.target);
@@ -766,12 +1630,18 @@ function useRafLoop() {
 function frame(now) {
   lastFrameAt = performance.now();
   const live = latest && now - lastPacketAt < IDLE_TIMEOUT;
-  app.classList.toggle("is-live", Boolean(live));
+  app.classList.toggle("is-live", Boolean(live) || mode === "analysis");
 
-  if (live) {
+  if (mode === "analysis" && analysis) {
+    if (now - lastGForceDraw > 33) {
+      const gforce = analysisGForce();
+      drawGForce(gforce.current, gforce.trail);
+      lastGForceDraw = now;
+    }
+  } else if (live) {
     renderInstruments(latest);
     if (now - lastGForceDraw > 33) {
-      drawGForce();
+      drawGForce(liveGForceCurrent(), liveGForceTrail());
       lastGForceDraw = now;
     }
   }
@@ -833,6 +1703,25 @@ function connect() {
     }
   };
 
+  source.addEventListener("session", (event) => {
+    let meta;
+    try {
+      meta = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    const count = Number(sessionsCountEl.textContent) || 0;
+    sessionsCountEl.textContent = String(count + 1);
+    if (meta.kind === "race") {
+      showToast(
+        `Course enregistrée · ${meta.lapCount} tour(s) · meilleur ${meta.bestLap > 0 ? formatLap(meta.bestLap) : "—"}`,
+      );
+    } else {
+      showToast("Balade enregistrée");
+    }
+    if (!sessionsModal.hidden) refreshSessions();
+  });
+
   source.onerror = () => {
     setConnection("error", "Serveur injoignable — reconnexion…");
   };
@@ -862,6 +1751,7 @@ setInterval(() => {
 
 connect();
 loadHealth();
+refreshSessions({ render: false });
 snapCameraToCar();
 scheduleFrame();
 
@@ -879,7 +1769,10 @@ if (new URLSearchParams(location.search).has("debug")) {
     controls,
     renderer,
     carGroup,
-    trackGeometry,
+    livePointGeometry,
+    liveSegmentGeometry,
+    liveTrailGroup,
+    archiveGroup,
     trailGlow,
     trailHalo,
     trackLine,
@@ -892,5 +1785,21 @@ if (new URLSearchParams(location.search).has("debug")) {
     get followCar() {
       return followCar;
     },
+    get mode() {
+      return mode;
+    },
+    get analysis() {
+      return analysis;
+    },
+    get sessions() {
+      return sessions;
+    },
+    get livePoints() {
+      return live.points;
+    },
+    selectSample,
+    loadSession,
+    exitAnalysis,
+    refreshSessions,
   };
 }

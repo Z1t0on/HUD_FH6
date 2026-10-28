@@ -18,7 +18,7 @@ export interface TelemetryListener {
  */
 export function listenTelemetry(
   options: ListenerOptions,
-  onTelemetry: (telemetry: Telemetry) => void,
+  onTelemetry: (telemetry: Telemetry, raw: Buffer) => void,
 ): TelemetryListener {
   const { port, host = "0.0.0.0" } = options;
   const socket = dgram.createSocket("udp4");
@@ -27,7 +27,7 @@ export function listenTelemetry(
 
   socket.on("message", (message) => {
     try {
-      onTelemetry(decodePacket(message));
+      onTelemetry(decodePacket(message), message);
     } catch (error) {
       invalidPackets += 1;
       if (error instanceof InvalidPacketError) {

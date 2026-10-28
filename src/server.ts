@@ -4,14 +4,17 @@ import { networkInterfaces } from "node:os";
 import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Telemetry } from "./telemetry/decode.js";
+import { SessionStore } from "./telemetry/sessions.js";
 import { listenTelemetry } from "./telemetry/udp.js";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PUBLIC_DIR = join(ROOT, "public");
 const THREE_DIR = join(ROOT, "node_modules", "three");
+const SESSIONS_DIR = process.env.HUD_SESSIONS_DIR ?? join(ROOT, "data", "sessions");
 
 const HTTP_PORT = Number(process.env.HUD_PORT ?? 3000);
 const UDP_PORT = Number(process.env.UDP_PORT ?? 9999);
+const SESSION_KEEP = Number(process.env.HUD_SESSION_KEEP ?? 40);
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -28,9 +31,32 @@ const clients = new Set<ServerResponse>();
 let lastPacketAt = 0;
 let packetCount = 0;
 
-const listener = listenTelemetry({ port: UDP_PORT }, (telemetry: Telemetry) => {
+function broadcastToClients(event: string, data: unknown): void {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of clients) {
+    try {
+      client.write(payload);
+    } catch {
+      clients.delete(client);
+    }
+  }
+}
+
+const sessionStore = new SessionStore({
+  dir: SESSIONS_DIR,
+  maxSessions: SESSION_KEEP,
+  onFinalized: (meta) => broadcastToClients("session", meta),
+});
+
+/** Sans ce balayage, une session resterait ouverte après la fin du flux. */
+const sessionSweep = setInterval(() => sessionStore.sweep(), 2000);
+sessionSweep.unref();
+
+const listener = listenTelemetry({ port: UDP_PORT }, (telemetry: Telemetry, raw: Buffer) => {
   lastPacketAt = Date.now();
   packetCount += 1;
+
+  sessionStore.push(telemetry, raw);
 
   // Diffusion aux overlays ; les clients lents sont ignorés plutôt que bloquants.
   const payload = `data: ${JSON.stringify(telemetry)}\n\n`;
@@ -105,8 +131,84 @@ const server = createServer((req, res) => {
         packets: packetCount,
         lastPacketAgoMs: lastPacketAt ? Date.now() - lastPacketAt : null,
         clients: clients.size,
+        sessions: sessionStore.list().length,
+        activeSession: sessionStore.activeInfo,
       }),
     );
+    return;
+  }
+
+  if (url.pathname === "/sessions" && req.method === "GET") {
+    const sessions = sessionStore.list();
+    const totalBytes = sessions.reduce((sum, meta) => sum + (meta.bytes || 0), 0);
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
+    res.end(
+      JSON.stringify({
+        sessions,
+        active: sessionStore.activeInfo,
+        totalBytes,
+        keep: SESSION_KEEP,
+      }),
+    );
+    return;
+  }
+
+  const dataMatch = url.pathname.match(/^\/sessions\/([A-Za-z0-9-]+)\/data$/);
+  if (dataMatch && req.method === "GET") {
+    const id = dataMatch[1];
+    const payload = id ? sessionStore.read(id) : null;
+    if (!payload) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Session introuvable");
+      return;
+    }
+
+    const header = {
+      version: 1,
+      id: payload.meta.id,
+      meta: payload.meta,
+      fields: payload.fields,
+      count: payload.count,
+      stride: payload.stride,
+      littleEndian: true,
+    };
+
+    let headerBuffer = Buffer.from(JSON.stringify(header), "utf8");
+    const padding = (4 - (headerBuffer.length % 4)) % 4;
+    if (padding > 0) {
+      headerBuffer = Buffer.concat([headerBuffer, Buffer.alloc(padding, 0x20)]);
+    }
+
+    const body = Buffer.alloc(8 + headerBuffer.length + payload.data.byteLength);
+    body.write("FH6S", 0, "ascii");
+    body.writeUInt32LE(headerBuffer.length, 4);
+    headerBuffer.copy(body, 8);
+    Buffer.from(payload.data.buffer, payload.data.byteOffset, payload.data.byteLength).copy(
+      body,
+      8 + headerBuffer.length,
+    );
+
+    res.writeHead(200, {
+      "Content-Type": "application/octet-stream",
+      "Content-Length": body.length,
+      "Cache-Control": "no-store",
+    });
+    res.end(body);
+    return;
+  }
+
+  const deleteMatch = url.pathname.match(/^\/sessions\/([A-Za-z0-9-]+)$/);
+  if (deleteMatch && req.method === "DELETE") {
+    const id = deleteMatch[1];
+    const removed = id ? sessionStore.remove(id) : false;
+    res.writeHead(removed ? 200 : 404, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
+    res.end(JSON.stringify({ removed }));
     return;
   }
 
@@ -134,6 +236,7 @@ const server = createServer((req, res) => {
 server.listen(HTTP_PORT, () => {
   console.log(`[hud] dashboard sur http://localhost:${HTTP_PORT}`);
   console.log(`[hud] état du flux : http://localhost:${HTTP_PORT}/health`);
+  console.log(`[hud] sessions enregistrées dans ${SESSIONS_DIR} (max ${SESSION_KEEP})`);
   const addresses = localAddresses();
   if (addresses.length > 0) {
     console.log(
@@ -146,7 +249,9 @@ server.listen(HTTP_PORT, () => {
 
 function shutdown(): void {
   console.log("\n[hud] arrêt…");
+  clearInterval(sessionSweep);
   listener.close();
+  sessionStore.close();
   server.close(() => process.exit(0));
   for (const client of clients) client.end();
 }

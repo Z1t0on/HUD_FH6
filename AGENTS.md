@@ -48,7 +48,11 @@ le code AGPL (RaceIQ) ne doit **jamais** être recopié (licence virale).
 
 - **Serveur** : Node.js + TypeScript (`src/server.ts`), UDP `0.0.0.0:9999`, HTTP `:3000`
 - **Décodage** : `src/telemetry/decode.ts` (paquet 324 o) + `src/telemetry/udp.ts`
-- **Transport navigateur** : SSE `/events` (60 Hz), état via `/health`
+- **Archivage** : `src/telemetry/sessions.ts` écrit les paquets bruts dans `data/sessions/`
+  (ignoré par Git), avec métadonnées JSON, segmentation et rétention (40 sessions)
+- **Colonnes d'analyse** : `src/telemetry/fields.ts`
+- **Transport navigateur** : SSE `/events` (60 Hz), état via `/health`, archives via
+  `/sessions`, `/sessions/:id/data` (binaire `FH6S`) et `DELETE /sessions/:id`
 - **Frontend** : `public/` en modules ES natifs, import map Three.js
 - **Three.js** : servi depuis `node_modules/three` via `/vendor/build/*` et
   `/vendor/addons/*` ; aucun bundler, ne pas déplacer ces routes sans mettre à jour
@@ -60,7 +64,7 @@ le code AGPL (RaceIQ) ne doit **jamais** être recopié (licence virale).
 | `npm run dev`   | serveur en mode watch               |
 | `npm run build` | compilation TypeScript vers `dist/` |
 | `npm start`     | serveur compilé                     |
-| `npm test`      | tests du décodeur                   |
+| `npm test`      | tests du décodeur et des sessions   |
 | `npm run sim`   | simulateur de flux à 60 Hz          |
 
 ## Structure
@@ -69,11 +73,12 @@ le code AGPL (RaceIQ) ne doit **jamais** être recopié (licence virale).
 HUD_FH6/
 ├── AGENTS.md          # Ce fichier (cadrage des agents)
 ├── Documentation/     # Doc Data Out officielle et références
+├── data/sessions/     # Archives des courses (créé au démarrage, ignoré par Git)
 ├── public/            # Dashboard : index.html, style.css, hud.js
 ├── src/
 │   ├── server.ts      # HTTP + SSE + service des fichiers/vendor
-│   └── telemetry/     # decode.ts, udp.ts
-├── test/              # Tests du décodeur
+│   └── telemetry/     # decode.ts, udp.ts, sessions.ts, fields.ts
+├── test/              # Tests du décodeur et des sessions
 ├── tools/             # simulate.ts
 ├── assets/            # Polices, images, icônes
 └── README.md          # Présentation publique du dépôt
@@ -86,6 +91,7 @@ HUD_FH6/
 - [x] Choix de la techno : serveur Node/TypeScript + dashboard navigateur + Three.js
 - [x] Décodeur du paquet 324 octets (5 tests unitaires)
 - [x] Rendu du HUD (instruments, carte 3D) et simulateur de flux
+- [x] Archivage des sessions sur disque + analyse interactive (tracé par tour, clic)
 - [x] Architecture « second PC » documentée (UDP LAN, pare-feu, ports)
 - [ ] Tests en conditions réelles avec FH6
 
@@ -100,6 +106,10 @@ HUD_FH6/
 - Le serveur HTTP n'a pas d'authentification : le réserver à un réseau local de confiance.
 - Le tracé 3D ne contient que le trajet parcouru depuis l'ouverture du dashboard
   (buffer glissant de 40 000 points).
+- Les sessions archivées sont des paquets **bruts** de 324 octets : toute donnée
+  présente ou future du paquet reste relisible sans réenregistrement.
+- Les fichiers `.raw` orphelins (arrêt brutal du serveur) sont récupérés au démarrage
+  et reconstitués en métadonnées ; ne pas les supprimer à la main sans raison.
 
 ## Attendus envers les agents
 

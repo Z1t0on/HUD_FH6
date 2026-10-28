@@ -9,3 +9,6 @@ node_modules/
 # Builds
 dist/
 build/
+
+# Enregistrements de sessions (données locales, jamais versionnées)
+data/

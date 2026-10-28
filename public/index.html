@@ -32,6 +32,9 @@
             <span id="status">Connexion…</span>
           </span>
           <span class="chip" id="udp-info">UDP 9999</span>
+          <button class="btn sessions-btn" id="sessions-open" type="button">
+            Sessions <span class="sessions-count" id="sessions-count">0</span>
+          </button>
           <button class="btn" id="fullscreen" type="button">Plein écran</button>
         </div>
       </header>
@@ -115,7 +118,7 @@
           <div class="map-overlay map-top">
             <div>
               <span class="panel-title">Carte 3D</span>
-              <span class="map-sub">Position X / Y / Z en temps réel</span>
+              <span class="map-sub" id="map-sub">Position X / Y / Z en temps réel</span>
             </div>
             <div class="map-metrics">
               <span>ALT <b id="altitude">—</b> m</span>
@@ -124,15 +127,78 @@
             </div>
           </div>
 
+          <div class="lap-legend" id="lap-legend" aria-label="Tours enregistrés"></div>
+
           <div class="map-overlay map-bottom">
-            <div class="map-controls">
-              <button class="btn" id="view-iso" type="button">Vue iso</button>
-              <button class="btn" id="view-fit" type="button">Vue d'ensemble</button>
-              <button class="btn is-active" id="follow-toggle" type="button">Suivi</button>
-              <button class="btn" id="clear-trail" type="button">Effacer tracé</button>
+            <div class="analysis-bar" id="analysis-bar" hidden>
+              <button class="btn" id="analysis-exit" type="button">Retour au direct</button>
+              <span class="analysis-title" id="analysis-title">—</span>
+              <input
+                class="analysis-range"
+                id="analysis-time"
+                type="range"
+                min="0"
+                max="1"
+                step="0.02"
+                value="0"
+                aria-label="Position dans la session"
+              />
+              <span class="analysis-clock" id="analysis-clock">0:00.000</span>
             </div>
-            <span class="map-hint">Glisser pour orbiter · molette pour zoomer · 1 carreau = 20 m</span>
+            <div class="map-controls-row">
+              <div class="map-controls">
+                <button class="btn" id="view-iso" type="button">Vue iso</button>
+                <button class="btn" id="view-fit" type="button">Vue d'ensemble</button>
+                <button class="btn is-active" id="follow-toggle" type="button">Suivi</button>
+                <button class="btn" id="clear-trail" type="button">Effacer tracé</button>
+              </div>
+              <span class="map-hint">Glisser pour orbiter · molette pour zoomer · 1 carreau = 20 m</span>
+            </div>
           </div>
+
+          <aside class="inspector" id="inspector" hidden aria-label="Télémétrie du point sélectionné">
+            <header class="inspector-head">
+              <span id="inspector-lap">TOUR —</span>
+              <span class="inspector-laptime" id="inspector-laptime">—</span>
+            </header>
+
+            <div class="inspector-main">
+              <div class="inspector-speed">
+                <b id="inspector-speed">0</b><span>KM/H</span>
+              </div>
+              <div class="inspector-cell">
+                <b id="inspector-gear">—</b><span>RAPPORT</span>
+              </div>
+              <div class="inspector-cell">
+                <b id="inspector-rpm">0</b><span>TR/MIN</span>
+              </div>
+            </div>
+
+            <div class="inspector-pedals">
+              <span>ACC <b id="inspector-throttle">0%</b></span>
+              <span>FR <b id="inspector-brake">0%</b></span>
+              <span>EMB <b id="inspector-clutch">0%</b></span>
+              <span>DIR <b id="inspector-steer">0%</b></span>
+            </div>
+
+            <div class="inspector-tires">
+              <span id="inspector-tire-fl" data-state="cold">AVG <b>—</b><i>Pression n/d</i></span>
+              <span id="inspector-tire-fr" data-state="cold">AVD <b>—</b><i>Pression n/d</i></span>
+              <span id="inspector-tire-rl" data-state="cold">ARG <b>—</b><i>Pression n/d</i></span>
+              <span id="inspector-tire-rr" data-state="cold">ARD <b>—</b><i>Pression n/d</i></span>
+            </div>
+
+            <div class="inspector-meta">
+              <span>G lat <b id="inspector-gx">0.00</b></span>
+              <span>G long <b id="inspector-gz">0.00</b></span>
+              <span>ALT <b id="inspector-alt">—</b> m</span>
+              <span>X <b id="inspector-x">—</b></span>
+              <span>Z <b id="inspector-z">—</b></span>
+              <span>POS <b id="inspector-position">—</b></span>
+            </div>
+
+            <footer class="inspector-foot" id="inspector-clock">—</footer>
+          </aside>
 
           <div class="map-waiting" id="map-waiting">En attente du flux Data Out…</div>
         </section>
@@ -210,6 +276,30 @@
         </section>
       </main>
     </div>
+
+    <div class="modal" id="sessions-modal" hidden role="dialog" aria-modal="true" aria-label="Sessions enregistrées">
+      <div class="modal-panel">
+        <header class="modal-head">
+          <div>
+            <h2>Sessions enregistrées</h2>
+            <p class="modal-sub" id="sessions-summary">Chargement…</p>
+          </div>
+          <div class="modal-actions">
+            <button class="btn" id="sessions-refresh" type="button">Actualiser</button>
+            <button class="btn modal-close" id="sessions-close" type="button" aria-label="Fermer">
+              Fermer
+            </button>
+          </div>
+        </header>
+        <div class="session-list" id="session-list"></div>
+        <p class="modal-foot">
+          Les sessions sont enregistrées automatiquement sur le PC HUD, dans <code>data/sessions/</code>.
+          Une course est découpée en sessions à chaque retour au menu, pause ou téléportation.
+        </p>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script type="module" src="hud.js"></script>
   </body>
