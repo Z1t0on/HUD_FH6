@@ -79,6 +79,15 @@ npm run sim
 Le simulateur envoie des paquets à `127.0.0.1:9999` à 60 Hz et simule un tour de
 circuit avec altitude, rapports, pédales, températures et chronos.
 
+## Comment le configurer sur le même PC :
+
+1. Lancez le HUD sur votre ordinateur (via l'exécutable HUD_FH6.exe ou avec la commande npm run dev).
+2. Ouvrez votre navigateur internet sur ce même PC et allez à l'adresse : http://localhost:3000.
+3. Dans les paramètres de Forza Horizon 6, rendez-vous dans Paramètres > ATH et gameplay > Data Out et entrez les valeurs suivantes :
+	• Data Out : ON
+	• Adresse IP : 127.0.0.1 (il s'agit de l'adresse de "bouclage local" ou localhost, qui indique au jeu d'envoyer les données à la machine elle-même plutôt qu'à travers le réseau).
+	• Port : 9999.
+
 ## Version portable (Windows x64)
 
 Pour le PC d'affichage, la [page des releases](https://github.com/Z1t0on/HUD_FH6/releases)
