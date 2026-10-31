@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>HUD FH6 — Telemetry</title>
-    <link rel="icon" href="data:," />
+    <link rel="icon" href="assets/HUD.ico" />
     <link rel="stylesheet" href="style.css" />
     <script type="importmap">
       {
@@ -29,9 +29,10 @@
         <div class="topbar-status">
           <span class="conn" id="conn">
             <i class="conn-dot"></i>
-            <span id="status">Connexion…</span>
+            <span id="status" data-i18n="status.connecting">Connexion…</span>
           </span>
           <span class="chip" id="udp-info">UDP 9999</span>
+
           <button
             class="btn units-btn"
             id="units-toggle"
@@ -41,95 +42,191 @@
           >
             KM/H · °C
           </button>
+
+          <button class="btn lang-btn" id="lang-toggle" type="button">FR</button>
+
+          <details class="menu" id="panels-menu">
+            <summary class="btn" data-i18n="menu.panels">Panneaux</summary>
+            <div class="menu-body" id="panels-menu-body"></div>
+          </details>
+
+          <details class="menu" id="theme-menu">
+            <summary class="btn" data-i18n="menu.theme">Thème</summary>
+            <div class="menu-body menu-theme" id="theme-menu-body">
+              <div class="menu-row">
+                <span class="menu-label" data-i18n="menu.preset">Ambiance</span>
+                <div class="theme-presets" id="theme-presets"></div>
+              </div>
+              <label class="menu-row">
+                <span class="menu-label" data-i18n="menu.accent">Accent</span>
+                <input type="color" id="theme-accent" value="#00e5ff" />
+              </label>
+              <label class="menu-row">
+                <span class="menu-label" data-i18n="menu.background">Fond</span>
+                <input type="color" id="theme-bg" value="#05080d" />
+              </label>
+              <div class="menu-row">
+                <span class="menu-label" data-i18n="menu.gauge">Compteur</span>
+                <button class="btn btn-small" id="gauge-toggle" type="button" data-gauge="digital">
+                  Digital
+                </button>
+              </div>
+              <button class="btn btn-small menu-reset" id="theme-reset" type="button">
+                <span data-i18n="menu.reset">Réinitialiser</span>
+              </button>
+            </div>
+          </details>
+
           <button class="btn sessions-btn" id="sessions-open" type="button">
             Sessions <span class="sessions-count" id="sessions-count">0</span>
           </button>
-          <button class="btn" id="fullscreen" type="button">Plein écran</button>
+          <button class="btn" id="fullscreen" type="button" data-i18n="app.fullscreen">
+            Plein écran
+          </button>
         </div>
       </header>
 
-      <main class="layout">
-        <section class="col col-left">
-          <section class="panel lap-panel" aria-label="Chronomètre">
-            <header class="panel-head">
-              <span class="panel-title">Chrono</span>
-              <span class="lap-count" id="lap-count">TOUR —</span>
-            </header>
+      <main class="layout" id="workspace">
+        <section
+          class="panel lap-panel"
+          data-panel="lap"
+          aria-label="Chronomètre"
+          data-i18n-aria="panels.lap"
+        >
+          <div class="panel-chrome">
+            <span class="panel-grip" aria-hidden="true"></span>
+            <button class="panel-hide" type="button" data-hide="lap" aria-label="Masquer le panneau Chrono">
+              ×
+            </button>
+          </div>
 
-            <div class="lap-current">
-              <span class="lap-label">Tour actuel</span>
-              <strong class="lap-time" id="lap-current">--:--.---</strong>
+          <header class="panel-head">
+            <span class="panel-title" data-i18n="lap.title">Chrono</span>
+            <span class="lap-count" id="lap-count">TOUR —</span>
+          </header>
+
+          <div class="lap-current">
+            <span class="lap-label" data-i18n="lap.current">Tour actuel</span>
+            <strong class="lap-time" id="lap-current">--:--.---</strong>
+          </div>
+
+          <div class="lap-rows">
+            <div class="lap-row">
+              <span data-i18n="lap.last">Dernier</span>
+              <b id="lap-last">--:--.---</b>
             </div>
-
-            <div class="lap-rows">
-              <div class="lap-row">
-                <span>Dernier</span>
-                <b id="lap-last">--:--.---</b>
-              </div>
-              <div class="lap-row">
-                <span>Meilleur</span>
-                <b id="lap-best" class="best">--:--.---</b>
-              </div>
+            <div class="lap-row">
+              <span data-i18n="lap.best">Meilleur</span>
+              <b id="lap-best" class="best">--:--.---</b>
             </div>
+          </div>
 
-            <div class="delta" id="delta" data-state="idle">
-              <span class="delta-label">Delta dernier / meilleur</span>
-              <b id="delta-value">—</b>
-            </div>
-          </section>
+          <div class="delta" id="delta" data-state="idle">
+            <span class="delta-label" data-i18n="lap.delta">Delta dernier / meilleur</span>
+            <b id="delta-value">—</b>
+          </div>
 
-          <section class="panel cluster-panel" aria-label="Compteur">
-            <div class="cluster" id="cluster">
-              <div class="shift-lights" id="shift-lights" aria-hidden="true"></div>
-
-              <div class="rpm-arc">
-                <svg viewBox="0 0 240 240" role="img" aria-label="Compte-tours">
-                  <defs>
-                    <linearGradient id="rpmGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                      <stop offset="0%" stop-color="#00e5ff" />
-                      <stop offset="55%" stop-color="#38d0ff" />
-                      <stop offset="78%" stop-color="#ffb020" />
-                      <stop offset="100%" stop-color="#ff3b3b" />
-                    </linearGradient>
-                    <filter id="rpmGlow" x="-30%" y="-30%" width="160%" height="160%">
-                      <feGaussianBlur stdDeviation="4" result="blur" />
-                      <feMerge>
-                        <feMergeNode in="blur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  <circle class="arc-track" cx="120" cy="120" r="100" />
-                  <circle class="arc-fill" id="rpm-arc" cx="120" cy="120" r="100" filter="url(#rpmGlow)" />
-                  <circle class="arc-cap" id="rpm-cap" cx="120" cy="20" r="4" />
-                </svg>
-
-                <div class="cluster-center">
-                  <div class="gear" id="gear">N</div>
-                  <div class="speed-block">
-                    <span class="speed-value" id="speed">0</span>
-                    <span class="speed-unit" id="speed-unit">KM/H</span>
-                  </div>
-                  <span class="speed-mph">
-                    <b id="speed-secondary">0</b>
-                    <span id="speed-secondary-unit">MPH</span>
-                  </span>
-                </div>
-              </div>
-
-              <div class="rpm-readout">
-                <span id="rpm">0</span><small> tr/min</small>
-              </div>
-            </div>
-          </section>
+          <span class="panel-resize br" aria-hidden="true"></span>
+          <span class="panel-resize bl" aria-hidden="true"></span>
+          <span class="panel-resize tr" aria-hidden="true"></span>
+          <span class="panel-resize tl" aria-hidden="true"></span>
         </section>
 
-        <section class="panel map-panel" id="map-panel" aria-label="Carte 3D">
+        <section
+          class="panel cluster-panel"
+          data-panel="cluster"
+          aria-label="Compteur"
+          data-i18n-aria="panels.cluster"
+        >
+          <div class="panel-chrome">
+            <span class="panel-grip" aria-hidden="true"></span>
+            <button class="panel-hide" type="button" data-hide="cluster" aria-label="Masquer le compteur">
+              ×
+            </button>
+          </div>
+
+          <div class="cluster" id="cluster" data-gauge="digital">
+            <div class="shift-lights" id="shift-lights" aria-hidden="true"></div>
+
+            <div class="rpm-arc">
+              <svg viewBox="0 0 240 240" role="img" aria-label="Compte-tours">
+                <defs>
+                  <linearGradient id="rpmGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#00e5ff" />
+                    <stop offset="55%" stop-color="#38d0ff" />
+                    <stop offset="78%" stop-color="#ffb020" />
+                    <stop offset="100%" stop-color="#ff3b3b" />
+                  </linearGradient>
+                  <filter id="rpmGlow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                <circle class="arc-track" cx="120" cy="120" r="100" />
+                <circle class="arc-fill" id="rpm-arc" cx="120" cy="120" r="100" filter="url(#rpmGlow)" />
+                <circle class="arc-cap" id="rpm-cap" cx="120" cy="20" r="4" />
+              </svg>
+
+              <div class="cluster-center">
+                <div class="gear" id="gear">N</div>
+                <div class="speed-block">
+                  <span class="speed-value" id="speed">0</span>
+                  <span class="speed-unit" id="speed-unit">KM/H</span>
+                </div>
+                <span class="speed-mph">
+                  <b id="speed-secondary">0</b>
+                  <span id="speed-secondary-unit">MPH</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="analog" id="analog">
+              <svg viewBox="0 0 240 240" role="img" aria-label="Compteur analogique">
+                <g class="analog-ticks" id="analog-ticks"></g>
+                <g class="analog-labels" id="analog-labels"></g>
+                <line class="analog-needle" id="analog-needle" x1="120" y1="120" x2="120" y2="46" />
+                <circle class="analog-hub" cx="120" cy="120" r="9" />
+              </svg>
+              <div class="analog-center">
+                <span class="analog-speed" id="analog-speed">0</span>
+                <span class="analog-unit" id="analog-unit">KM/H</span>
+                <span class="analog-gear" id="analog-gear">N</span>
+              </div>
+            </div>
+
+            <div class="rpm-readout">
+              <span id="rpm">0</span><small data-i18n="unit.rpm-short"> tr/min</small>
+            </div>
+          </div>
+
+          <span class="panel-resize br" aria-hidden="true"></span>
+          <span class="panel-resize bl" aria-hidden="true"></span>
+          <span class="panel-resize tr" aria-hidden="true"></span>
+          <span class="panel-resize tl" aria-hidden="true"></span>
+        </section>
+
+        <section
+          class="panel map-panel"
+          data-panel="map"
+          id="map-panel"
+          aria-label="Carte 3D"
+          data-i18n-aria="panels.map"
+        >
+          <div class="panel-chrome">
+            <span class="panel-grip" aria-hidden="true"></span>
+            <button class="panel-hide" type="button" data-hide="map" aria-label="Masquer la carte 3D">
+              ×
+            </button>
+          </div>
+
           <canvas id="scene"></canvas>
 
           <div class="map-overlay map-top">
             <div>
-              <span class="panel-title">Carte 3D</span>
+              <span class="panel-title" data-i18n="map.title">Carte 3D</span>
               <span class="map-sub" id="map-sub">Position X / Y / Z en temps réel</span>
             </div>
             <div class="map-metrics">
@@ -143,7 +240,9 @@
 
           <div class="map-overlay map-bottom">
             <div class="analysis-bar" id="analysis-bar" hidden>
-              <button class="btn" id="analysis-exit" type="button">Retour au direct</button>
+              <button class="btn" id="analysis-exit" type="button" data-i18n="map.back-live">
+                Retour au direct
+              </button>
               <span class="analysis-title" id="analysis-title">—</span>
               <input
                 class="analysis-range"
@@ -159,10 +258,14 @@
             </div>
             <div class="map-controls-row">
               <div class="map-controls">
-                <button class="btn" id="view-iso" type="button">Vue iso</button>
-                <button class="btn" id="view-fit" type="button">Vue d'ensemble</button>
-                <button class="btn is-active" id="follow-toggle" type="button">Suivi</button>
-                <button class="btn" id="clear-trail" type="button">Effacer tracé</button>
+                <button class="btn" id="view-iso" type="button" data-i18n="map.iso">Vue iso</button>
+                <button class="btn" id="view-fit" type="button" data-i18n="map.fit">Vue d'ensemble</button>
+                <button class="btn is-active" id="follow-toggle" type="button" data-i18n="map.follow">
+                  Suivi
+                </button>
+                <button class="btn" id="clear-trail" type="button" data-i18n="map.clear">
+                  Effacer tracé
+                </button>
               </div>
               <span class="map-hint" id="map-hint">
                 Glisser pour orbiter · molette pour zoomer · 1 carreau = 20 m
@@ -170,145 +273,245 @@
             </div>
           </div>
 
-          <aside class="inspector" id="inspector" hidden aria-label="Télémétrie du point sélectionné">
-            <header class="inspector-head">
-              <span id="inspector-lap">TOUR —</span>
-              <span class="inspector-laptime" id="inspector-laptime">—</span>
-            </header>
+          <div class="map-waiting" id="map-waiting" data-i18n="map.waiting">
+            En attente du flux Data Out…
+          </div>
 
-            <div class="inspector-main">
-              <div class="inspector-speed">
-                <b id="inspector-speed">0</b><span id="inspector-speed-unit">KM/H</span>
-              </div>
-              <div class="inspector-cell">
-                <b id="inspector-gear">—</b><span>RAPPORT</span>
-              </div>
-              <div class="inspector-cell">
-                <b id="inspector-rpm">0</b><span>TR/MIN</span>
-              </div>
-            </div>
-
-            <div class="inspector-pedals">
-              <span>ACC <b id="inspector-throttle">0%</b></span>
-              <span>FR <b id="inspector-brake">0%</b></span>
-              <span>EMB <b id="inspector-clutch">0%</b></span>
-              <span>DIR <b id="inspector-steer">0%</b></span>
-            </div>
-
-            <div class="inspector-tires">
-              <span id="inspector-tire-fl" data-state="cold">AVG <b>—</b><i>Pression n/d</i></span>
-              <span id="inspector-tire-fr" data-state="cold">AVD <b>—</b><i>Pression n/d</i></span>
-              <span id="inspector-tire-rl" data-state="cold">ARG <b>—</b><i>Pression n/d</i></span>
-              <span id="inspector-tire-rr" data-state="cold">ARD <b>—</b><i>Pression n/d</i></span>
-            </div>
-
-            <div class="inspector-meta">
-              <span>G lat <b id="inspector-gx">0.00</b></span>
-              <span>G long <b id="inspector-gz">0.00</b></span>
-              <span>ALT <b id="inspector-alt">—</b><i class="unit" id="inspector-alt-unit">m</i></span>
-              <span>X <b id="inspector-x">—</b><i class="unit" id="inspector-x-unit">m</i></span>
-              <span>Z <b id="inspector-z">—</b><i class="unit" id="inspector-z-unit">m</i></span>
-              <span>POS <b id="inspector-position">—</b></span>
-            </div>
-
-            <footer class="inspector-foot" id="inspector-clock">—</footer>
-          </aside>
-
-          <div class="map-waiting" id="map-waiting">En attente du flux Data Out…</div>
+          <span class="panel-resize br" aria-hidden="true"></span>
+          <span class="panel-resize bl" aria-hidden="true"></span>
+          <span class="panel-resize tr" aria-hidden="true"></span>
+          <span class="panel-resize tl" aria-hidden="true"></span>
         </section>
 
-        <section class="col col-right">
-          <section class="panel tires-panel" aria-label="Pneus">
-            <header class="panel-head">
-              <span class="panel-title">Pneus</span>
-              <span class="tire-note">Température</span>
-            </header>
+        <section class="panel tires-panel" data-panel="tires" aria-label="Pneus" data-i18n-aria="panels.tires">
+          <div class="panel-chrome">
+            <span class="panel-grip" aria-hidden="true"></span>
+            <button class="panel-hide" type="button" data-hide="tires" aria-label="Masquer le panneau Pneus">
+              ×
+            </button>
+          </div>
 
-            <div class="tire-grid">
-              <article class="tire" id="tire-fl" data-state="cold">
-                <span class="tire-corner">AVG</span>
-                <strong class="tire-temp">—</strong>
-                <span class="tire-pressure">Pression n/d</span>
-              </article>
-              <article class="tire" id="tire-fr" data-state="cold">
-                <span class="tire-corner">AVD</span>
-                <strong class="tire-temp">—</strong>
-                <span class="tire-pressure">Pression n/d</span>
-              </article>
-              <article class="tire" id="tire-rl" data-state="cold">
-                <span class="tire-corner">ARG</span>
-                <strong class="tire-temp">—</strong>
-                <span class="tire-pressure">Pression n/d</span>
-              </article>
-              <article class="tire" id="tire-rr" data-state="cold">
-                <span class="tire-corner">ARD</span>
-                <strong class="tire-temp">—</strong>
-                <span class="tire-pressure">Pression n/d</span>
-              </article>
-            </div>
+          <header class="panel-head">
+            <span class="panel-title" data-i18n="tires.title">Pneus</span>
+            <span class="tire-note" data-i18n="tires.note">Température</span>
+          </header>
 
-            <div class="tire-legend">
-              <span data-state="cold">Froid</span>
-              <span data-state="ideal">Idéal</span>
-              <span data-state="hot">Chaud</span>
-              <span data-state="overheat">Surchauffe</span>
-            </div>
-          </section>
+          <div class="tire-grid">
+            <article class="tire" id="tire-fl" data-state="cold">
+              <span class="tire-corner" data-i18n="tire.fl">AVG</span>
+              <strong class="tire-temp">—</strong>
+              <span class="tire-pressure" data-i18n="tires.pressure-none">Pression n/d</span>
+            </article>
+            <article class="tire" id="tire-fr" data-state="cold">
+              <span class="tire-corner" data-i18n="tire.fr">AVD</span>
+              <strong class="tire-temp">—</strong>
+              <span class="tire-pressure" data-i18n="tires.pressure-none">Pression n/d</span>
+            </article>
+            <article class="tire" id="tire-rl" data-state="cold">
+              <span class="tire-corner" data-i18n="tire.rl">ARG</span>
+              <strong class="tire-temp">—</strong>
+              <span class="tire-pressure" data-i18n="tires.pressure-none">Pression n/d</span>
+            </article>
+            <article class="tire" id="tire-rr" data-state="cold">
+              <span class="tire-corner" data-i18n="tire.rr">ARD</span>
+              <strong class="tire-temp">—</strong>
+              <span class="tire-pressure" data-i18n="tires.pressure-none">Pression n/d</span>
+            </article>
+          </div>
 
-          <section class="panel pedals-panel" aria-label="Pédales">
-            <header class="panel-head">
-              <span class="panel-title">Commandes</span>
-            </header>
-            <div class="pedals">
-              <div class="pedal pedal-throttle">
-                <div class="pedal-fill" id="throttle-fill"></div>
-                <span class="pedal-label">ACC</span>
-                <span class="pedal-value" id="throttle-value">0%</span>
-              </div>
-              <div class="pedal pedal-brake">
-                <div class="pedal-fill" id="brake-fill"></div>
-                <span class="pedal-label">FR</span>
-                <span class="pedal-value" id="brake-value">0%</span>
-              </div>
-              <div class="pedal pedal-clutch">
-                <div class="pedal-fill" id="clutch-fill"></div>
-                <span class="pedal-label">EMB</span>
-                <span class="pedal-value" id="clutch-value">0%</span>
-              </div>
-            </div>
-          </section>
+          <div class="tire-legend">
+            <span data-state="cold" data-i18n="tires.cold">Froid</span>
+            <span data-state="ideal" data-i18n="tires.ideal">Idéal</span>
+            <span data-state="hot" data-i18n="tires.hot">Chaud</span>
+            <span data-state="overheat" data-i18n="tires.overheat">Surchauffe</span>
+          </div>
 
-          <section class="panel gforce-panel" aria-label="Accéléromètre">
-            <header class="panel-head">
-              <span class="panel-title">G-Force</span>
-              <span class="gforce-readout" id="gforce-readout">0.00 g</span>
-            </header>
-            <div class="gforce-wrap">
-              <canvas id="gforce"></canvas>
+          <span class="panel-resize br" aria-hidden="true"></span>
+          <span class="panel-resize bl" aria-hidden="true"></span>
+          <span class="panel-resize tr" aria-hidden="true"></span>
+          <span class="panel-resize tl" aria-hidden="true"></span>
+        </section>
+
+        <section
+          class="panel pedals-panel"
+          data-panel="pedals"
+          aria-label="Pédales"
+          data-i18n-aria="panels.pedals"
+        >
+          <div class="panel-chrome">
+            <span class="panel-grip" aria-hidden="true"></span>
+            <button class="panel-hide" type="button" data-hide="pedals" aria-label="Masquer le panneau Commandes">
+              ×
+            </button>
+          </div>
+
+          <header class="panel-head">
+            <span class="panel-title" data-i18n="pedals.title">Commandes</span>
+          </header>
+          <div class="pedals">
+            <div class="pedal pedal-throttle">
+              <div class="pedal-fill" id="throttle-fill"></div>
+              <span class="pedal-label" data-i18n="pedals.throttle">ACC</span>
+              <span class="pedal-value" id="throttle-value">0%</span>
             </div>
-          </section>
+            <div class="pedal pedal-brake">
+              <div class="pedal-fill" id="brake-fill"></div>
+              <span class="pedal-label" data-i18n="pedals.brake">FR</span>
+              <span class="pedal-value" id="brake-value">0%</span>
+            </div>
+            <div class="pedal pedal-clutch">
+              <div class="pedal-fill" id="clutch-fill"></div>
+              <span class="pedal-label" data-i18n="pedals.clutch">EMB</span>
+              <span class="pedal-value" id="clutch-value">0%</span>
+            </div>
+          </div>
+
+          <span class="panel-resize br" aria-hidden="true"></span>
+          <span class="panel-resize bl" aria-hidden="true"></span>
+          <span class="panel-resize tr" aria-hidden="true"></span>
+          <span class="panel-resize tl" aria-hidden="true"></span>
+        </section>
+
+        <section
+          class="panel gforce-panel"
+          data-panel="gforce"
+          aria-label="Accéléromètre"
+          data-i18n-aria="panels.gforce"
+        >
+          <div class="panel-chrome">
+            <span class="panel-grip" aria-hidden="true"></span>
+            <button class="panel-hide" type="button" data-hide="gforce" aria-label="Masquer le panneau G-Force">
+              ×
+            </button>
+          </div>
+
+          <header class="panel-head">
+            <span class="panel-title">G-Force</span>
+            <span class="gforce-readout" id="gforce-readout">0.00 g</span>
+          </header>
+          <div class="gforce-wrap">
+            <canvas id="gforce"></canvas>
+          </div>
+
+          <span class="panel-resize br" aria-hidden="true"></span>
+          <span class="panel-resize bl" aria-hidden="true"></span>
+          <span class="panel-resize tr" aria-hidden="true"></span>
+          <span class="panel-resize tl" aria-hidden="true"></span>
+        </section>
+
+        <section
+          class="panel inspector-panel"
+          data-panel="inspector"
+          id="inspector"
+          hidden
+          aria-label="Télémétrie du point sélectionné"
+          data-i18n-aria="panels.inspector"
+        >
+          <div class="panel-chrome">
+            <span class="panel-grip" aria-hidden="true"></span>
+            <button class="panel-hide" type="button" data-hide="inspector" aria-label="Masquer l'inspecteur">
+              ×
+            </button>
+          </div>
+
+          <header class="inspector-head">
+            <span id="inspector-lap">TOUR —</span>
+            <span class="inspector-laptime" id="inspector-laptime">—</span>
+          </header>
+
+          <div class="inspector-main">
+            <div class="inspector-speed">
+              <b id="inspector-speed">0</b><span id="inspector-speed-unit">KM/H</span>
+            </div>
+            <div class="inspector-cell">
+              <b id="inspector-gear">—</b><span data-i18n="inspector.gear">RAPPORT</span>
+            </div>
+            <div class="inspector-cell">
+              <b id="inspector-rpm">0</b><span data-i18n="inspector.rpm">TR/MIN</span>
+            </div>
+          </div>
+
+          <div class="inspector-pedals">
+            <span><span data-i18n="pedals.throttle">ACC</span> <b id="inspector-throttle">0%</b></span>
+            <span><span data-i18n="pedals.brake">FR</span> <b id="inspector-brake">0%</b></span>
+            <span><span data-i18n="pedals.clutch">EMB</span> <b id="inspector-clutch">0%</b></span>
+            <span><span data-i18n="inspector.steer">DIR</span> <b id="inspector-steer">0%</b></span>
+          </div>
+
+          <div class="inspector-tires">
+            <span id="inspector-tire-fl" data-state="cold">
+              <span data-i18n="tire.fl">AVG</span> <b>—</b><i data-i18n="tires.pressure-none">Pression n/d</i>
+            </span>
+            <span id="inspector-tire-fr" data-state="cold">
+              <span data-i18n="tire.fr">AVD</span> <b>—</b><i data-i18n="tires.pressure-none">Pression n/d</i>
+            </span>
+            <span id="inspector-tire-rl" data-state="cold">
+              <span data-i18n="tire.rl">ARG</span> <b>—</b><i data-i18n="tires.pressure-none">Pression n/d</i>
+            </span>
+            <span id="inspector-tire-rr" data-state="cold">
+              <span data-i18n="tire.rr">ARD</span> <b>—</b><i data-i18n="tires.pressure-none">Pression n/d</i>
+            </span>
+          </div>
+
+          <div class="inspector-meta">
+            <span><span data-i18n="inspector.g-lat">G lat</span> <b id="inspector-gx">0.00</b></span>
+            <span><span data-i18n="inspector.g-long">G long</span> <b id="inspector-gz">0.00</b></span>
+            <span>ALT <b id="inspector-alt">—</b><i class="unit" id="inspector-alt-unit">m</i></span>
+            <span>X <b id="inspector-x">—</b><i class="unit" id="inspector-x-unit">m</i></span>
+            <span>Z <b id="inspector-z">—</b><i class="unit" id="inspector-z-unit">m</i></span>
+            <span>POS <b id="inspector-position">—</b></span>
+          </div>
+
+          <footer class="inspector-foot" id="inspector-clock">—</footer>
+
+          <span class="panel-resize br" aria-hidden="true"></span>
+          <span class="panel-resize bl" aria-hidden="true"></span>
+          <span class="panel-resize tr" aria-hidden="true"></span>
+          <span class="panel-resize tl" aria-hidden="true"></span>
         </section>
       </main>
     </div>
 
-    <div class="modal" id="sessions-modal" hidden role="dialog" aria-modal="true" aria-label="Sessions enregistrées">
+    <div
+      class="modal"
+      id="sessions-modal"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sessions enregistrées"
+      data-i18n-aria="session-list.title"
+    >
       <div class="modal-panel">
         <header class="modal-head">
           <div>
-            <h2>Sessions enregistrées</h2>
+            <h2 data-i18n="session-list.title">Sessions enregistrées</h2>
             <p class="modal-sub" id="sessions-summary">Chargement…</p>
           </div>
           <div class="modal-actions">
-            <button class="btn" id="sessions-refresh" type="button">Actualiser</button>
-            <button class="btn modal-close" id="sessions-close" type="button" aria-label="Fermer">
+            <label class="switch" title="Archiver les nouvelles sessions">
+              <input type="checkbox" id="recording-toggle" checked />
+              <span class="switch-track"></span>
+              <span class="switch-label" id="recording-label">Archivage actif</span>
+            </label>
+            <button class="btn" id="sessions-refresh" type="button" data-i18n="session-list.refresh">
+              Actualiser
+            </button>
+            <button
+              class="btn modal-close"
+              id="sessions-close"
+              type="button"
+              aria-label="Fermer"
+              data-i18n="session-list.close"
+            >
               Fermer
             </button>
           </div>
         </header>
         <div class="session-list" id="session-list"></div>
-        <p class="modal-foot">
-          Les sessions sont enregistrées automatiquement sur le PC HUD, dans <code>data/sessions/</code>.
-          Une course est découpée en sessions à chaque retour au menu, pause ou téléportation.
+        <p class="modal-foot" id="sessions-foot" data-i18n="session-list.foot">
+          Les sessions sont enregistrées sur le PC HUD, dans <code>data/sessions</code>. Une session
+          sans roulage réel (moins de 30 m) n'est pas conservée. Épinglez une session pour la
+          protéger de la suppression automatique.
         </p>
       </div>
     </div>

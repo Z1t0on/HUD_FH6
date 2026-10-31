@@ -20,6 +20,7 @@ const speedSecondaryEl = $("speed-secondary");
 const speedUnitEl = $("speed-unit");
 const speedSecondaryUnitEl = $("speed-secondary-unit");
 const unitsButton = $("units-toggle");
+const langToggle = $("lang-toggle");
 const gearEl = $("gear");
 const rpmEl = $("rpm");
 const rpmArc = $("rpm-arc");
@@ -67,6 +68,8 @@ const sessionsListEl = $("session-list");
 const sessionsSummaryEl = $("sessions-summary");
 const sessionsCloseButton = $("sessions-close");
 const sessionsRefreshButton = $("sessions-refresh");
+const recordingToggle = $("recording-toggle");
+const recordingLabel = $("recording-label");
 const mapSubEl = $("map-sub");
 const lapLegendEl = $("lap-legend");
 const analysisBar = $("analysis-bar");
@@ -126,17 +129,19 @@ const TRACK_MIN_DISTANCE = 1.2;
 const TRACK_TELEPORT_DISTANCE = 800;
 const TRACK_MAX_SEGMENT = 80;
 
+/* Teintes volontairement très écartées : les trois premiers tours sont
+   cyan / rose / jaune, lisibles côte à côte sur le tracé 3D. */
 const LAP_PALETTE = [
   "#00e5ff",
-  "#2ee6a8",
-  "#ffb020",
   "#ff4d9d",
+  "#ffd21f",
+  "#4ade80",
   "#a06cff",
   "#ff8a3d",
-  "#7dd3fc",
-  "#e6ff3b",
+  "#4d9dff",
   "#ff5c5c",
-  "#9dffb0",
+  "#00ffd0",
+  "#e6e6e6",
 ];
 const LAP_COLORS = LAP_PALETTE.map((hex) => new THREE.Color(hex));
 
@@ -146,6 +151,409 @@ const TIRE_COLORS = {
   hot: "#ffb020",
   overheat: "#ff3b3b",
 };
+
+/* ------------------------------- Langue */
+
+const LANG_KEY = "hud-fh6:lang";
+
+/**
+ * Textes de l'interface. Chaque clé est utilisée soit par un attribut
+ * `data-i18n` du HTML, soit par un appel `t("…")` du script.
+ */
+const TRANSLATIONS = {
+  fr: {
+    "app.fullscreen": "Plein écran",
+    "menu.panels": "Panneaux",
+    "menu.theme": "Thème",
+    "menu.preset": "Ambiance",
+    "menu.accent": "Accent",
+    "menu.background": "Fond",
+    "menu.gauge": "Compteur",
+    "menu.reset": "Réinitialiser",
+    "menu.reset-layout": "Réinitialiser la disposition",
+    "theme.preset-cyber": "Cyber",
+    "theme.preset-ember": "Ambre",
+    "theme.preset-daylight": "Clair",
+    "gauge.digital": "Digital",
+    "gauge.analog": "Analogique",
+    "panels.lap": "Chrono",
+    "panels.cluster": "Compteur",
+    "panels.map": "Carte 3D",
+    "panels.tires": "Pneus",
+    "panels.pedals": "Commandes",
+    "panels.gforce": "G-Force",
+    "panels.inspector": "Inspecteur",
+    "status.connecting": "Connexion…",
+    "status.waiting": "En attente du flux Data Out",
+    "status.live": "Data Out actif",
+    "status.error": "Flux interrompu",
+    "lap.title": "Chrono",
+    "lap.count": "TOUR {n}",
+    "lap.current": "Tour actuel",
+    "lap.last": "Dernier",
+    "lap.best": "Meilleur",
+    "lap.delta": "Delta dernier / meilleur",
+    "unit.rpm": "tr/min",
+    "unit.rpm-short": " tr/min",
+    "map.title": "Carte 3D",
+    "map.sub-live": "Position X / Y / Z en temps réel",
+    "map.sub-analysis": "Session archivée · cliquez sur le tracé",
+    "map.waiting": "En attente du flux Data Out…",
+    "map.iso": "Vue iso",
+    "map.fit": "Vue d'ensemble",
+    "map.follow": "Suivi",
+    "map.free": "Libre",
+    "map.clear": "Effacer tracé",
+    "map.back-live": "Retour au direct",
+    "map.hint": "Glisser pour orbiter · molette pour zoomer · 1 carreau = {cell}",
+    "tires.title": "Pneus",
+    "tires.note": "Température",
+    "tires.pressure-none": "Pression n/d",
+    "tires.cold": "Froid",
+    "tires.ideal": "Idéal",
+    "tires.hot": "Chaud",
+    "tires.overheat": "Surchauffe",
+    "tire.fl": "AVG",
+    "tire.fr": "AVD",
+    "tire.rl": "ARG",
+    "tire.rr": "ARD",
+    "pedals.title": "Commandes",
+    "pedals.throttle": "ACC",
+    "pedals.brake": "FR",
+    "pedals.clutch": "EMB",
+    "inspector.gear": "RAPPORT",
+    "inspector.rpm": "TR/MIN",
+    "inspector.steer": "DIR",
+    "inspector.g-lat": "G lat",
+    "inspector.g-long": "G long",
+    "session.race": "Course · {n} tour(s)",
+    "session.free": "Balade libre",
+    "session.stat-duration": "Durée",
+    "session.stat-best": "Meilleur",
+    "session.stat-distance": "Distance",
+    "session.stat-vmax": "V. max",
+    "session.analyze": "Analyser",
+    "session.delete": "Supprimer",
+    "session.pin": "Épingler",
+    "session.unpin": "Détacher",
+    "session.pinned": "Épinglée",
+    "session-list.title": "Sessions enregistrées",
+    "session-list.loading": "Chargement…",
+    "session-list.empty": "Aucune session enregistrée pour l'instant. Roulez : l'enregistrement est automatique.",
+    "session-list.empty-short": "0 session",
+    "session-list.count": "{n} session(s)",
+    "session-list.summary": "{n} session(s) · {size} · {kept} épinglée(s) · conservation : {keep} max",
+    "session-list.refresh": "Actualiser",
+    "session-list.close": "Fermer",
+    "session-list.unreachable": "Impossible de charger les sessions : serveur injoignable.",
+    "session-list.server-down": "Serveur injoignable",
+    "session-list.recording-on": "Archivage actif",
+    "session-list.recording-off": "Archivage suspendu",
+    "session-list.recording-title": "Archiver les nouvelles sessions",
+    "session-list.foot": "Les sessions sont enregistrées sur le PC HUD, dans data/sessions. Une session sans roulage réel (moins de 30 m) n'est pas conservée. Épinglez une session pour la protéger de la suppression automatique.",
+    "session.confirm-delete": "Supprimer définitivement cette session enregistrée ?",
+    "toast.session-saved": "Session enregistrée",
+    "toast.session-saved-race": "Course enregistrée · {n} tour(s) · meilleur {best}",
+    "toast.session-saved-free": "Balade enregistrée",
+    "toast.session-deleted": "Session supprimée",
+    "toast.delete-failed": "Suppression impossible",
+    "toast.load-failed": "Impossible de charger la session",
+    "toast.panel-hidden": "Panneau « {name} » masqué",
+    "toast.layout-reset": "Disposition réinitialisée",
+    "toast.pinned": "Session épinglée",
+    "toast.unpinned": "Session détachée",
+    "toast.action-failed": "Action impossible",
+    "toast.recording-on": "Archivage activé",
+    "toast.recording-off": "Archivage suspendu",
+    "lang.button": "{code}",
+    "lang.title": "Langue : {name} — passer à {next}",
+    "lang.french": "français",
+    "lang.english": "anglais",
+    "lang.name-fr": "Français",
+    "lang.name-en": "English",
+    "units.aria": "Système d'unités : {system}",
+    "units.title": "Passer au système {next} ({units})",
+    "units.metric": "métrique",
+    "units.imperial": "impérial",
+    "units.metric-units": "km/h, °C, m",
+    "units.imperial-units": "mph, °F, ft",
+    "unit.mo": "Mo",
+    "unit.gb": "Go",
+    "analysis.race": "Course · {n} tour(s) · {time}",
+    "analysis.free": "Balade libre · {time}",
+    "analysis.session-of": "Course {race} · {session} de session",
+  },
+  en: {
+    "app.fullscreen": "Fullscreen",
+    "menu.panels": "Panels",
+    "menu.theme": "Theme",
+    "menu.preset": "Preset",
+    "menu.accent": "Accent",
+    "menu.background": "Background",
+    "menu.gauge": "Gauge",
+    "menu.reset": "Reset",
+    "menu.reset-layout": "Reset layout",
+    "theme.preset-cyber": "Cyber",
+    "theme.preset-ember": "Amber",
+    "theme.preset-daylight": "Light",
+    "gauge.digital": "Digital",
+    "gauge.analog": "Analog",
+    "panels.lap": "Lap timer",
+    "panels.cluster": "Cluster",
+    "panels.map": "3D map",
+    "panels.tires": "Tires",
+    "panels.pedals": "Inputs",
+    "panels.gforce": "G-Force",
+    "panels.inspector": "Inspector",
+    "status.connecting": "Connecting…",
+    "status.waiting": "Waiting for Data Out",
+    "status.live": "Data Out live",
+    "status.error": "Stream lost",
+    "lap.title": "Lap timer",
+    "lap.count": "LAP {n}",
+    "lap.current": "Current lap",
+    "lap.last": "Last",
+    "lap.best": "Best",
+    "lap.delta": "Delta last / best",
+    "unit.rpm": "rpm",
+    "unit.rpm-short": " rpm",
+    "map.title": "3D map",
+    "map.sub-live": "Live X / Y / Z position",
+    "map.sub-analysis": "Archived session · click the trail",
+    "map.waiting": "Waiting for Data Out…",
+    "map.iso": "Iso view",
+    "map.fit": "Overview",
+    "map.follow": "Follow",
+    "map.free": "Free",
+    "map.clear": "Clear trail",
+    "map.back-live": "Back to live",
+    "map.hint": "Drag to orbit · wheel to zoom · 1 square = {cell}",
+    "tires.title": "Tires",
+    "tires.note": "Temperature",
+    "tires.pressure-none": "Pressure n/a",
+    "tires.cold": "Cold",
+    "tires.ideal": "Ideal",
+    "tires.hot": "Hot",
+    "tires.overheat": "Overheat",
+    "tire.fl": "FL",
+    "tire.fr": "FR",
+    "tire.rl": "RL",
+    "tire.rr": "RR",
+    "pedals.title": "Inputs",
+    "pedals.throttle": "THR",
+    "pedals.brake": "BRK",
+    "pedals.clutch": "CLT",
+    "inspector.gear": "GEAR",
+    "inspector.rpm": "RPM",
+    "inspector.steer": "STR",
+    "inspector.g-lat": "Lat G",
+    "inspector.g-long": "Lon G",
+    "session.race": "Race · {n} lap(s)",
+    "session.free": "Free roam",
+    "session.stat-duration": "Duration",
+    "session.stat-best": "Best",
+    "session.stat-distance": "Distance",
+    "session.stat-vmax": "Top speed",
+    "session.analyze": "Analyze",
+    "session.delete": "Delete",
+    "session.pin": "Pin",
+    "session.unpin": "Unpin",
+    "session.pinned": "Pinned",
+    "session-list.title": "Recorded sessions",
+    "session-list.loading": "Loading…",
+    "session-list.empty": "No sessions recorded yet. Just drive: recording is automatic.",
+    "session-list.empty-short": "0 sessions",
+    "session-list.count": "{n} session(s)",
+    "session-list.summary": "{n} session(s) · {size} · {kept} pinned · keep: {keep} max",
+    "session-list.refresh": "Refresh",
+    "session-list.close": "Close",
+    "session-list.unreachable": "Unable to load sessions: server unreachable.",
+    "session-list.server-down": "Server unreachable",
+    "session-list.recording-on": "Recording on",
+    "session-list.recording-off": "Recording paused",
+    "session-list.recording-title": "Record new sessions",
+    "session-list.foot": "Sessions are stored on the HUD PC in data/sessions. A session without real driving (under 30 m) is discarded. Pin a session to protect it from automatic deletion.",
+    "session.confirm-delete": "Permanently delete this recorded session?",
+    "toast.session-saved": "Session recorded",
+    "toast.session-saved-race": "Race recorded · {n} lap(s) · best {best}",
+    "toast.session-saved-free": "Free roam recorded",
+    "toast.session-deleted": "Session deleted",
+    "toast.delete-failed": "Delete failed",
+    "toast.load-failed": "Unable to load the session",
+    "toast.panel-hidden": "Panel “{name}” hidden",
+    "toast.layout-reset": "Layout reset",
+    "toast.pinned": "Session pinned",
+    "toast.unpinned": "Session unpinned",
+    "toast.action-failed": "Action failed",
+    "toast.recording-on": "Recording enabled",
+    "toast.recording-off": "Recording paused",
+    "lang.button": "{code}",
+    "lang.title": "Language: {name} — switch to {next}",
+    "lang.french": "French",
+    "lang.english": "English",
+    "lang.name-fr": "Français",
+    "lang.name-en": "English",
+    "units.aria": "Unit system: {system}",
+    "units.title": "Switch to the {next} system ({units})",
+    "units.metric": "metric",
+    "units.imperial": "imperial",
+    "units.metric-units": "km/h, °C, m",
+    "units.imperial-units": "mph, °F, ft",
+    "unit.mo": "MB",
+    "unit.gb": "GB",
+    "analysis.race": "Race · {n} lap(s) · {time}",
+    "analysis.free": "Free roam · {time}",
+    "analysis.session-of": "Race {race} · {session} of session",
+  },
+};
+
+function detectLanguage() {
+  try {
+    const stored = localStorage.getItem(LANG_KEY);
+    if (stored === "fr" || stored === "en") return { value: stored, manual: true };
+  } catch {
+    // Stockage indisponible : détection par la langue du navigateur.
+  }
+  const tag = ((Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || "fr")
+    .toLowerCase();
+  return { value: tag.startsWith("en") ? "en" : "fr", manual: false };
+}
+
+const initialLanguage = detectLanguage();
+let lang = initialLanguage.value;
+/** true si l'utilisateur a choisi sa langue (sinon elle suit les unités). */
+let languageChosen = initialLanguage.manual;
+
+function t(key, vars) {
+  const table = TRANSLATIONS[lang] ?? TRANSLATIONS.fr;
+  let text = table[key] ?? TRANSLATIONS.fr[key] ?? key;
+  if (vars) {
+    for (const [name, value] of Object.entries(vars)) {
+      text = text.split(`{${name}}`).join(String(value));
+    }
+  }
+  return text;
+}
+
+function uiLocale() {
+  return lang === "fr" ? "fr-FR" : "en-US";
+}
+
+/** Applique les traductions au document et rafraîchit les vues dynamiques. */
+function applyLanguage({ rerender = false } = {}) {
+  document.documentElement.lang = lang;
+
+  for (const element of document.querySelectorAll("[data-i18n]")) {
+    element.textContent = t(element.dataset.i18n);
+  }
+  for (const element of document.querySelectorAll("[data-i18n-title]")) {
+    element.title = t(element.dataset.i18nTitle);
+  }
+  for (const element of document.querySelectorAll("[data-i18n-aria]")) {
+    element.setAttribute("aria-label", t(element.dataset.i18nAria));
+  }
+
+  if (typeof langToggle !== "undefined" && langToggle) {
+    langToggle.textContent = lang.toUpperCase();
+    const nextName = lang === "fr" ? t("lang.english") : t("lang.french");
+    langToggle.title = t("lang.title", {
+      name: lang === "fr" ? t("lang.name-fr") : t("lang.name-en"),
+      next: nextName,
+    });
+    langToggle.setAttribute("aria-label", langToggle.title);
+  }
+
+  if (typeof unitSystem !== "undefined") applyUnitLabels();
+  if (typeof buildPanelsMenu === "function" && typeof panelsMenuBody !== "undefined" && panelsMenuBody) {
+    buildPanelsMenu();
+  }
+  if (typeof refreshThemeMenu === "function" && typeof themePresetsEl !== "undefined" && themePresetsEl) {
+    refreshThemeMenu();
+  }
+  if (typeof recordingLabel !== "undefined" && recordingLabel && typeof recordingToggle !== "undefined") {
+    recordingLabel.textContent = recordingToggle?.checked
+      ? t("session-list.recording-on")
+      : t("session-list.recording-off");
+  }
+  if (typeof lapCountEl !== "undefined" && lapCountEl && latest) {
+    lapCountEl.textContent = t("lap.count", { n: latest.lapNumber + 1 });
+  }
+  if (typeof followToggle !== "undefined" && followToggle) {
+    followToggle.textContent = followCar ? t("map.follow") : t("map.free");
+  }
+  if (typeof mapSubEl !== "undefined" && mapSubEl) {
+    mapSubEl.textContent = mode === "analysis" ? t("map.sub-analysis") : t("map.sub-live");
+  }
+  if (typeof analysisTitleEl !== "undefined" && analysisTitleEl && analysis) {
+    analysisTitleEl.textContent =
+      analysis.meta.kind === "race"
+        ? t("analysis.race", { n: analysis.meta.lapCount, time: formatClock(analysis.meta.duration) })
+        : t("analysis.free", { time: formatClock(analysis.meta.duration) });
+  }
+  if (typeof inspectorEls !== "undefined" && inspectorEls?.clock && analysis) {
+    if (typeof updateInspector === "function") updateInspector(analysis.sampleIndex ?? 0);
+  }
+  if (rerender && typeof renderSessionList === "function" && typeof sessionsListEl !== "undefined") {
+    renderSessionList(lastSessionsPayload);
+  }
+
+  // Mettre à jour les titres des panneaux
+  for (const [name, def] of Object.entries(PANEL_DEFAULTS)) {
+    const panelElement = panelEls.get(name);
+    if (panelElement) {
+      const titleElement = panelElement.querySelector(".panel-title");
+      if (titleElement) {
+        titleElement.textContent = t(def.label);
+      }
+    }
+  }
+
+  /* Libellés communs à plusieurs éléments. Les libellés distincts d'une même
+     classe (.tire-corner, .pedal-label) restent portés par data-i18n : les
+     écraser ici collerait le même texte aux quatre roues ou aux trois pédales. */
+  const panelTexts = {
+    ".lap-label": "lap.current",
+    ".delta-label": "lap.delta",
+    ".tire-note": "tires.note",
+    ".tire-pressure": "tires.pressure-none"
+  };
+
+  for (const [selector, key] of Object.entries(panelTexts)) {
+    for (const element of document.querySelectorAll(selector)) {
+      if (element.textContent !== t(key)) {
+        element.textContent = t(key);
+      }
+    }
+  }
+
+  // Mettre à jour les états des pneus
+  const tireStates = document.querySelectorAll(".tire-state");
+  tireStates.forEach((element, index) => {
+    const states = ["cold", "ideal", "hot", "overheat"];
+    if (element.dataset.state) {
+      element.textContent = t(`tires.${element.dataset.state}`);
+    }
+  });
+}
+
+function setLanguage(next, { manual = true, rerender = true } = {}) {
+  lang = next === "en" ? "en" : "fr";
+  languageChosen = manual || languageChosen;
+  if (manual) {
+    try {
+      localStorage.setItem(LANG_KEY, lang);
+    } catch {
+      // Stockage indisponible : le choix vaut pour la session en cours.
+    }
+  }
+  applyLanguage({ rerender });
+}
+
+/** Les unités impériales basculent l'interface en anglais, sauf choix manuel. */
+function syncLanguageWithUnits() {
+  if (languageChosen) return;
+  setLanguage(isImperial() ? "en" : "fr", { manual: false });
+}
 
 /* ------------------------------- Unités */
 
@@ -159,8 +567,7 @@ const GRID_CELL_METERS = 20;
 /** Pays qui utilisent encore les unités impériales dans la vie courante. */
 const IMPERIAL_REGIONS = new Set(["US", "LR", "MM"]);
 
-const LOCALE =
-  (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || "fr-FR";
+const LOCALE_FALLBACK = "fr-FR";
 
 function detectUnitSystem() {
   try {
@@ -236,7 +643,7 @@ function mapScaleHint() {
   const cell = isImperial()
     ? `${Math.round(GRID_CELL_METERS * METERS_TO_FEET)} ft`
     : `${GRID_CELL_METERS} m`;
-  return `Glisser pour orbiter · molette pour zoomer · 1 carreau = ${cell}`;
+  return t("map.hint", { cell });
 }
 
 function applyUnitLabels() {
@@ -259,11 +666,13 @@ function applyUnitLabels() {
   unitsButton.dataset.units = unitSystem;
   unitsButton.setAttribute(
     "aria-label",
-    isImperial() ? "Système d'unités : impérial" : "Système d'unités : métrique",
+    t("units.aria", { system: isImperial() ? t("units.imperial") : t("units.metric") }),
   );
   unitsButton.title = isImperial()
-    ? "Passer au système métrique (km/h, °C, m)"
-    : "Passer au système impérial (mph, °F, ft)";
+    ? t("units.title", { next: t("units.metric"), units: t("units.metric-units") })
+    : t("units.title", { next: t("units.imperial"), units: t("units.imperial-units") });
+
+  if (typeof refreshAnalogScale === "function" && analogTicksEl) refreshAnalogScale();
 }
 
 /** Réaffiche les valeurs visibles après un changement d'unités. */
@@ -294,6 +703,7 @@ function setUnitSystem(next) {
     // Préférence non persistée : le choix reste actif pour la session en cours.
   }
   applyUnitLabels();
+  syncLanguageWithUnits();
   refreshUnitReadouts();
 }
 
@@ -387,22 +797,492 @@ function formatDistance(meters) {
 }
 
 function formatBytes(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 Mo";
+  if (!Number.isFinite(bytes) || bytes <= 0) return `0 ${t("unit.mo")}`;
   const megabytes = bytes / (1024 * 1024);
-  return `${megabytes < 10 ? megabytes.toFixed(1) : Math.round(megabytes)} Mo`;
+  const unit = megabytes < 1024 ? t("unit.mo") : t("unit.gb");
+  const value = megabytes < 1024 ? megabytes : megabytes / 1024;
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${unit}`;
 }
 
 function formatDateTime(epochMs) {
   if (!Number.isFinite(epochMs)) return "—";
-  return new Date(epochMs).toLocaleString(LOCALE, {
+  return new Date(epochMs).toLocaleString(uiLocale(), {
     dateStyle: "short",
     timeStyle: "short",
   });
 }
 
+/* ------------------------------- Panneaux flottants */
+
+/** Disposition par défaut, en fractions de l'espace de travail. */
+const PANEL_DEFAULTS = {
+  lap: { label: "panels.lap", x: 0, y: 0, w: 0.235, h: 0.305 },
+  cluster: { label: "panels.cluster", x: 0, y: 0.318, w: 0.235, h: 0.682 },
+  map: { label: "panels.map", x: 0.245, y: 0, w: 0.505, h: 1 },
+  tires: { label: "panels.tires", x: 0.76, y: 0, w: 0.24, h: 0.4 },
+  pedals: { label: "panels.pedals", x: 0.76, y: 0.41, w: 0.24, h: 0.275 },
+  gforce: { label: "panels.gforce", x: 0.76, y: 0.695, w: 0.24, h: 0.305 },
+  inspector: { label: "panels.inspector", x: 0.505, y: 0.39, w: 0.245, h: 0.395, open: false },
+};
+
+const LAYOUT_KEY = "hud-fh6:layout";
+/* Ancienne position d'usine de l'inspecteur : elle recouvrait les boutons de
+   la carte. Une disposition enregistrée à cet emplacement exact est réalignée
+   sur la nouvelle position par défaut. */
+const LEGACY_INSPECTOR_PLACEMENT = { x: 0.255, y: 0.6 };
+const STACKED_QUERY = window.matchMedia("(max-width: 760px)");
+const WORKSPACE_MIN_PX = { width: 150, height: 110 };
+
+const workspace = $("workspace");
+const panelsMenuBody = $("panels-menu-body");
+const panelEls = new Map();
+for (const element of workspace.querySelectorAll("[data-panel]")) {
+  panelEls.set(element.dataset.panel, element);
+}
+
+let panelZ = 20;
+
+function defaultPanelState() {
+  const state = {};
+  for (const [name, def] of Object.entries(PANEL_DEFAULTS)) {
+    state[name] = {
+      x: def.x,
+      y: def.y,
+      w: def.w,
+      h: def.h,
+      hidden: def.open === false,
+    };
+  }
+  return state;
+}
+
+function loadPanelState() {
+  const base = defaultPanelState();
+  try {
+    const stored = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "null");
+    if (!stored || typeof stored !== "object") return base;
+    for (const [name, value] of Object.entries(stored)) {
+      if (!base[name] || !value || typeof value !== "object") continue;
+      if (
+        name === "inspector" &&
+        Math.abs(Number(value.x) - LEGACY_INSPECTOR_PLACEMENT.x) < 0.002 &&
+        Math.abs(Number(value.y) - LEGACY_INSPECTOR_PLACEMENT.y) < 0.002
+      ) {
+        continue;
+      }
+      const w = clamp(Number(value.w) || base[name].w, 0.05, 1);
+      const h = clamp(Number(value.h) || base[name].h, 0.05, 1);
+      base[name] = {
+        x: clamp(Number(value.x) || 0, 0, 1 - w),
+        y: clamp(Number(value.y) || 0, 0, 1 - h),
+        w,
+        h,
+        hidden: Boolean(value.hidden),
+      };
+    }
+  } catch {
+    return base;
+  }
+  return base;
+}
+
+let panelState = loadPanelState();
+
+function savePanelState() {
+  try {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(panelState));
+  } catch {
+    // Stockage indisponible : la disposition reste valable pour la session.
+  }
+}
+
+function isStackedLayout() {
+  return STACKED_QUERY.matches;
+}
+
+function applyPanelLayout(name) {
+  const element = panelEls.get(name);
+  const state = panelState[name];
+  if (!element || !state) return;
+
+  if (state.hidden) element.hidden = true;
+
+  if (isStackedLayout()) {
+    element.style.removeProperty("left");
+    element.style.removeProperty("top");
+    element.style.removeProperty("width");
+    element.style.removeProperty("height");
+    return;
+  }
+
+  const width = workspace.clientWidth;
+  const height = workspace.clientHeight;
+  if (width === 0 || height === 0) return;
+
+  element.style.left = `${Math.round(state.x * width)}px`;
+  element.style.top = `${Math.round(state.y * height)}px`;
+  element.style.width = `${Math.round(state.w * width)}px`;
+  element.style.height = `${Math.round(state.h * height)}px`;
+}
+
+function applyAllPanels() {
+  for (const name of panelEls.keys()) applyPanelLayout(name);
+}
+
+/** Place un panneau au premier plan, dans la plage autorisée (20 à 60). */
+function bringToFront(element) {
+  panelZ = panelZ >= 59 ? 21 : panelZ + 1;
+  element.style.zIndex = String(panelZ);
+}
+
+function setPanelHidden(name, hidden) {
+  const state = panelState[name];
+  const element = panelEls.get(name);
+  if (!state || !element) return;
+
+  state.hidden = hidden;
+  element.hidden = hidden;
+  /* Une tuile réaffichée repasse devant : elle ne doit jamais apparaître
+     sous une voisine installée entre-temps. */
+  if (!hidden) bringToFront(element);
+  savePanelState();
+  syncPanelsMenu();
+}
+
+function syncPanelsMenu() {
+  for (const input of panelsMenuBody.querySelectorAll("input[data-panel-toggle]")) {
+    const state = panelState[input.dataset.panelToggle];
+    if (state) input.checked = !state.hidden;
+  }
+}
+
+function buildPanelsMenu() {
+  panelsMenuBody.textContent = "";
+
+  for (const [name, def] of Object.entries(PANEL_DEFAULTS)) {
+    const label = document.createElement("label");
+    label.className = "menu-check";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.dataset.panelToggle = name;
+    input.checked = !panelState[name].hidden;
+    input.addEventListener("change", () => setPanelHidden(name, !input.checked));
+
+    const text = document.createElement("span");
+    text.textContent = t(def.label);
+
+    label.append(input, text);
+    panelsMenuBody.append(label);
+  }
+
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.className = "btn btn-small menu-reset";
+  reset.textContent = t("menu.reset-layout");
+  reset.addEventListener("click", () => {
+    panelState = defaultPanelState();
+    savePanelState();
+    for (const [name] of panelEls) {
+      const element = panelEls.get(name);
+      if (element) element.hidden = panelState[name].hidden;
+    }
+    applyAllPanels();
+    syncPanelsMenu();
+    showToast(t("toast.layout-reset"));
+  });
+  panelsMenuBody.append(reset);
+}
+
+/** Convertit un rectangle en fractions de l'espace de travail. */
+function rectToFractions(left, top, width, height) {
+  const wsWidth = Math.max(1, workspace.clientWidth);
+  const wsHeight = Math.max(1, workspace.clientHeight);
+  const w = clamp(width / wsWidth, 0.05, 1);
+  const h = clamp(height / wsHeight, 0.05, 1);
+  return {
+    x: clamp(left / wsWidth, 0, 1 - w),
+    y: clamp(top / wsHeight, 0, 1 - h),
+    w,
+    h,
+  };
+}
+
+/* ------- Disposition : glissement libre, chevauchement autorisé */
+
+const SNAP_DISTANCE = 12;
+
+/** Session de glissement ou de redimensionnement en cours. */
+let dragSession = null;
+
+/** Complète un rectangle par ses bords droit et bas. */
+function toBox(rect) {
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    right: rect.left + rect.width,
+    bottom: rect.top + rect.height,
+  };
+}
+
+/** Rectangles des panneaux visibles, dans le repère de l'espace de travail. */
+function capturePanelRects(excludeName = null) {
+  const wsRect = workspace.getBoundingClientRect();
+  const rects = new Map();
+  for (const [name, element] of panelEls) {
+    if (name === excludeName || element.hidden) continue;
+    const rect = element.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) continue;
+    rects.set(name, {
+      left: rect.left - wsRect.left,
+      top: rect.top - wsRect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+  }
+  return rects;
+}
+
+/**
+ * Aimantation : bords de l'espace de travail et arêtes des panneaux voisins,
+ * uniquement à courte distance. Elle aligne la tuile, elle ne l'empêche pas de
+ * recouvrir un voisin.
+ */
+function snapPanelRect(rect, neighbours, bounds) {
+  const box = toBox(rect);
+  let bestX = 0;
+  let bestY = 0;
+
+  const considerX = (target) => {
+    const delta = target - box.left;
+    if (delta !== 0 && Math.abs(delta) <= SNAP_DISTANCE && Math.abs(delta) < Math.abs(bestX)) bestX = delta;
+  };
+  const considerY = (target) => {
+    const delta = target - box.top;
+    if (delta !== 0 && Math.abs(delta) <= SNAP_DISTANCE && Math.abs(delta) < Math.abs(bestY)) bestY = delta;
+  };
+
+  considerX(0);
+  considerX(bounds.width - box.width);
+  considerY(0);
+  considerY(bounds.height - box.height);
+
+  for (const rect of neighbours.values()) {
+    const other = toBox(rect);
+    const verticalOverlap = Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top);
+    const horizontalOverlap = Math.min(box.right, other.right) - Math.max(box.left, other.left);
+    if (verticalOverlap > 0) {
+      considerX(other.right); // accoler à droite du voisin
+      considerX(other.left - box.width); // accoler à gauche du voisin
+    }
+    if (horizontalOverlap > 0) {
+      considerY(other.bottom); // accoler sous le voisin
+      considerY(other.top - box.height); // accoler au-dessus du voisin
+    }
+  }
+
+  return {
+    left: clamp(box.left + bestX, 0, Math.max(0, bounds.width - box.width)),
+    top: clamp(box.top + bestY, 0, Math.max(0, bounds.height - box.height)),
+  };
+}
+
+/** Mémorise la disposition courante en fractions de l'espace de travail. */
+function commitPanelLayout() {
+  const wsRect = workspace.getBoundingClientRect();
+  for (const [name, element] of panelEls) {
+    if (element.hidden) continue;
+    const rect = element.getBoundingClientRect();
+    panelState[name] = {
+      ...panelState[name],
+      ...rectToFractions(rect.left - wsRect.left, rect.top - wsRect.top, rect.width, rect.height),
+    };
+  }
+  savePanelState();
+}
+
+/** Direction de la poignée de redimensionnement saisie (quatre coins). */
+function resizeDirectionOf(target) {
+  for (const direction of ["br", "bl", "tr", "tl"]) {
+    if (target.classList.contains(direction)) return direction;
+  }
+  return "br";
+}
+
+/**
+ * Calcule le rectangle cible d'un redimensionnement directionnel, borné par
+ * l'espace de travail et la taille minimale. Le recouvrement d'un voisin est
+ * autorisé : c'est le prix du glissement libre.
+ */
+function resizePanelRect(session, dx, dy) {
+  const bounds = session.bounds;
+  const start = session.start;
+  const minWidth = WORKSPACE_MIN_PX.width;
+  const minHeight = WORKSPACE_MIN_PX.height;
+
+  let left = start.left;
+  let top = start.top;
+  let width = start.width;
+  let height = start.height;
+
+  if (session.direction.includes("r")) {
+    width = clamp(start.width + dx, minWidth, Math.max(minWidth, bounds.width - start.left));
+  }
+  if (session.direction.includes("l")) {
+    left = clamp(start.left + dx, 0, start.left + start.width - minWidth);
+    width = start.left + start.width - left;
+  }
+  if (session.direction.includes("b")) {
+    height = clamp(start.height + dy, minHeight, Math.max(minHeight, bounds.height - start.top));
+  }
+  if (session.direction.includes("t")) {
+    top = clamp(start.top + dy, 0, start.top + start.height - minHeight);
+    height = start.top + start.height - top;
+  }
+
+  return { left, top, width, height };
+}
+
+/**
+ * Démarre le glissement ou le redimensionnement d'un panneau. La tuile
+ * manipulée passe au premier plan et peut recouvrir ses voisines ; ses
+ * voisines, elles, ne bougent jamais.
+ */
+function startPanelInteraction(element, event, kind) {
+  if (isStackedLayout() || event.button !== 0) return;
+  if (event.target instanceof Element && event.target.closest("button, input, summary, label")) return;
+
+  const bounds = { width: workspace.clientWidth, height: workspace.clientHeight };
+  if (bounds.width === 0 || bounds.height === 0) return;
+
+  const wsRect = workspace.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
+  const name = element.dataset.panel;
+  if (!name) return;
+
+  const start = {
+    left: rect.left - wsRect.left,
+    top: rect.top - wsRect.top,
+    width: rect.width,
+    height: rect.height,
+  };
+
+  const session = {
+    name,
+    kind,
+    bounds,
+    pointerX: event.clientX,
+    pointerY: event.clientY,
+    start,
+    /* Dernière position acceptée, utile à l'inspection et au repli. */
+    current: start,
+    neighbours: capturePanelRects(name),
+    direction: kind === "resize" ? resizeDirectionOf(event.target) : null,
+  };
+  dragSession = session;
+
+  element.classList.add(kind === "drag" ? "is-dragging" : "is-resizing");
+  bringToFront(element);
+  event.preventDefault();
+
+  const onMove = (moveEvent) => {
+    const dx = moveEvent.clientX - session.pointerX;
+    const dy = moveEvent.clientY - session.pointerY;
+
+    let target;
+    if (kind === "drag") {
+      const free = {
+        left: clamp(session.start.left + dx, 0, Math.max(0, bounds.width - session.start.width)),
+        top: clamp(session.start.top + dy, 0, Math.max(0, bounds.height - session.start.height)),
+        width: session.start.width,
+        height: session.start.height,
+      };
+      const snapped = snapPanelRect(free, session.neighbours, bounds);
+      target = { ...free, left: snapped.left, top: snapped.top };
+    } else {
+      target = resizePanelRect(session, dx, dy);
+    }
+
+    session.current = target;
+    element.style.left = `${Math.round(target.left)}px`;
+    element.style.top = `${Math.round(target.top)}px`;
+    if (kind === "resize") {
+      element.style.width = `${Math.round(target.width)}px`;
+      element.style.height = `${Math.round(target.height)}px`;
+    }
+  };
+
+  const onUp = () => {
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    element.classList.remove("is-dragging", "is-resizing");
+    dragSession = null;
+    commitPanelLayout();
+  };
+
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp, { once: true });
+}
+
+function initPanels() {
+  for (const [name, element] of panelEls) {
+    element.style.zIndex = String(element.dataset.panel === "map" ? 10 : 20);
+
+    /* Toute tuile saisie passe devant ses voisines, sans exception. */
+    element.addEventListener("pointerdown", () => bringToFront(element));
+
+    const chrome = element.querySelector(".panel-chrome");
+    if (chrome) chrome.addEventListener("pointerdown", (event) => startPanelInteraction(element, event, "drag"));
+
+    const head = element.querySelector(":scope > .panel-head");
+    if (head) head.addEventListener("pointerdown", (event) => startPanelInteraction(element, event, "drag"));
+
+    // Ajouter des écouteurs à toutes les poignées de redimensionnement
+    const handles = element.querySelectorAll(":scope > .panel-resize");
+    handles.forEach(handle => {
+      handle.addEventListener("pointerdown", (event) => startPanelInteraction(element, event, "resize"));
+    });
+
+    for (const button of element.querySelectorAll("[data-hide]")) {
+      button.addEventListener("click", () => {
+        setPanelHidden(name, true);
+        showToast(t("toast.panel-hidden", { name: t(PANEL_DEFAULTS[name]?.label ?? name) }));
+      });
+    }
+
+    applyPanelLayout(name);
+  }
+
+  buildPanelsMenu();
+  syncPanelsMenu();
+
+  window.addEventListener("resize", applyAllPanels);
+  STACKED_QUERY.addEventListener("change", applyAllPanels);
+
+  /* L'espace de travail peut changer de taille après l'initialisation
+     (barre d'état, menus dépliés) : les fractions sont réappliquées. */
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(() => {
+      if (dragSession) return;
+      applyAllPanels();
+    }).observe(workspace);
+  }
+
+  /* Second passage après la mise en page du navigateur : l'espace de travail
+     n'a pas toujours sa taille définitive à l'initialisation. */
+  requestAnimationFrame(() => {
+    applyAllPanels();
+  });
+}
+
+initPanels();
+
 /* ------------------------------- Three.js */
 
 const canvas = $("scene");
+
 const renderer = new THREE.WebGLRenderer({
   canvas,
   antialias: true,
@@ -786,7 +1666,7 @@ function snapCameraToCar() {
 function setFollow(enabled) {
   followCar = enabled;
   followToggle.classList.toggle("is-active", enabled);
-  followToggle.textContent = enabled ? "Suivi" : "Libre";
+  followToggle.textContent = enabled ? t("map.follow") : t("map.free");
   if (enabled) {
     const direction = camera.position.clone().sub(controls.target);
     if (direction.lengthSq() < 1) direction.copy(isoOffset);
@@ -1022,6 +1902,13 @@ function renderInstruments(telemetry) {
   speedSecondaryEl.textContent = String(speedSecondary);
   gearEl.textContent = gearLabel(telemetry.gear);
 
+  if (themeState.gauge === "analog") {
+    const ratio = speedPrimary / analogMaxSpeed();
+    analogNeedleEl.style.transform = `rotate(${-120 + clamp(ratio, 0, 1) * 240}deg)`;
+    analogSpeedEl.textContent = String(speedPrimary);
+    analogGearEl.textContent = gearLabel(telemetry.gear);
+  }
+
   const maxRpm = telemetry.engineMaxRpm > 1000 ? telemetry.engineMaxRpm : 8000;
   const ratio = clamp(telemetry.rpm / maxRpm, 0, 1);
   rpmArc.style.strokeDashoffset = String(ARC_CIRCUMFERENCE * (1 - ratio));
@@ -1037,7 +1924,7 @@ function renderInstruments(telemetry) {
   }
   cluster.classList.toggle("shift-active", ratio >= SHIFT_THRESHOLD);
 
-  rpmEl.textContent = Math.round(telemetry.rpm).toLocaleString(LOCALE);
+  rpmEl.textContent = Math.round(telemetry.rpm).toLocaleString(uiLocale());
 
   const throttle = telemetry.throttle / 255;
   const brake = telemetry.brake / 255;
@@ -1072,7 +1959,7 @@ function renderInstruments(telemetry) {
   lapCurrentEl.textContent = formatLap(telemetry.currentLap);
   lapLastEl.textContent = formatLap(telemetry.lastLap);
   lapBestEl.textContent = formatLap(telemetry.bestLap);
-  lapCountEl.textContent = `TOUR ${telemetry.lapNumber + 1}`;
+  lapCountEl.textContent = t("lap.count", { n: telemetry.lapNumber + 1 });
 
   if (telemetry.lastLap > 0 && telemetry.bestLap > 0) {
     const delta = telemetry.lastLap - telemetry.bestLap;
@@ -1137,6 +2024,7 @@ function makeStat(label, value) {
 function sessionRow(meta) {
   const row = document.createElement("div");
   row.className = "session-row";
+  if (meta.kept) row.classList.add("is-kept");
 
   const main = document.createElement("div");
   main.className = "session-main";
@@ -1149,8 +2037,8 @@ function sessionRow(meta) {
   kind.className = "session-kind";
   kind.textContent =
     meta.kind === "race"
-      ? `Course · ${meta.lapCount} ${meta.lapCount > 1 ? "tours" : "tour"}`
-      : "Balade libre";
+      ? t("session.race", { n: meta.lapCount })
+      : t("session.free");
 
   const laps = document.createElement("div");
   laps.className = "session-laps";
@@ -1161,35 +2049,54 @@ function sessionRow(meta) {
     laps.appendChild(stripe);
   }
 
+  if (meta.kept) {
+    const badge = document.createElement("span");
+    badge.className = "session-badge";
+    badge.textContent = t("session.pinned");
+    kind.append(badge);
+  }
+
   main.append(date, kind, laps);
 
   const stats = document.createElement("div");
   stats.className = "session-stats";
   stats.append(
-    makeStat("Durée", formatLap(meta.duration)),
-    makeStat("Meilleur", meta.bestLap > 0 ? formatLap(meta.bestLap) : "—"),
-    makeStat("Distance", formatDistance(meta.distance)),
-    makeStat("V. max", `${Math.round(convertSpeed(meta.maxSpeed))} ${speedUnit().toLowerCase()}`),
+    makeStat(t("session.stat-duration"), formatLap(meta.duration)),
+    makeStat(t("session.stat-best"), meta.bestLap > 0 ? formatLap(meta.bestLap) : "—"),
+    makeStat(t("session.stat-distance"), formatDistance(meta.distance)),
+    makeStat(
+      t("session.stat-vmax"),
+      `${Math.round(convertSpeed(meta.maxSpeed))} ${speedUnit().toLowerCase()}`,
+    ),
   );
 
   const actions = document.createElement("div");
   actions.className = "session-actions";
+
+  const pinButton = document.createElement("button");
+  pinButton.type = "button";
+  pinButton.className = "btn";
+  pinButton.classList.toggle("is-active", meta.kept === true);
+  pinButton.dataset.action = "keep";
+  pinButton.dataset.id = meta.id;
+  pinButton.dataset.kept = meta.kept ? "1" : "0";
+  pinButton.textContent = meta.kept ? t("session.unpin") : t("session.pin");
 
   const analyzeButton = document.createElement("button");
   analyzeButton.type = "button";
   analyzeButton.className = "btn";
   analyzeButton.dataset.action = "analyze";
   analyzeButton.dataset.id = meta.id;
-  analyzeButton.textContent = "Analyser";
+  analyzeButton.textContent = t("session.analyze");
 
   const deleteButton = document.createElement("button");
   deleteButton.type = "button";
   deleteButton.className = "btn danger";
   deleteButton.dataset.action = "delete";
   deleteButton.dataset.id = meta.id;
-  deleteButton.textContent = "Supprimer";
+  deleteButton.textContent = t("session.delete");
 
-  actions.append(analyzeButton, deleteButton);
+  actions.append(pinButton, analyzeButton, deleteButton);
   row.append(main, stats, actions);
   return row;
 }
@@ -1202,16 +2109,21 @@ function renderSessionList(data) {
   if (!list.length) {
     const empty = document.createElement("p");
     empty.className = "session-empty";
-    empty.textContent =
-      "Aucune session enregistrée pour l'instant. Roulez : l'enregistrement est automatique.";
+    empty.textContent = t("session-list.empty");
     sessionsListEl.appendChild(empty);
-    sessionsSummaryEl.textContent = "0 session";
+    sessionsSummaryEl.textContent = t("session-list.empty-short");
     return;
   }
 
   const totalBytes = payload?.totalBytes ?? list.reduce((sum, meta) => sum + (meta.bytes || 0), 0);
   const keep = payload?.keep ?? 40;
-  sessionsSummaryEl.textContent = `${list.length} session(s) · ${formatBytes(totalBytes)} · conservation : ${keep} max`;
+  const kept = payload?.kept ?? list.filter((meta) => meta.kept).length;
+  sessionsSummaryEl.textContent = t("session-list.summary", {
+    n: list.length,
+    size: formatBytes(totalBytes),
+    kept,
+    keep,
+  });
 
   for (const meta of list) {
     sessionsListEl.appendChild(sessionRow(meta));
@@ -1226,6 +2138,7 @@ async function refreshSessions({ render = true } = {}) {
     sessions = Array.isArray(data.sessions) ? data.sessions : [];
     lastSessionsPayload = data;
     sessionsCountEl.textContent = String(sessions.length);
+    if (typeof data.recording === "boolean") applyRecordingState(data.recording);
     if (render) renderSessionList(data);
     return data;
   } catch (error) {
@@ -1234,9 +2147,9 @@ async function refreshSessions({ render = true } = {}) {
       sessionsListEl.replaceChildren();
       const empty = document.createElement("p");
       empty.className = "session-empty";
-      empty.textContent = "Impossible de charger les sessions : serveur injoignable.";
+      empty.textContent = t("session-list.unreachable");
       sessionsListEl.appendChild(empty);
-      sessionsSummaryEl.textContent = "Serveur injoignable";
+      sessionsSummaryEl.textContent = t("session-list.server-down");
     }
     return null;
   }
@@ -1252,18 +2165,65 @@ function closeSessions() {
 }
 
 async function deleteSession(id) {
-  if (!window.confirm("Supprimer définitivement cette session enregistrée ?")) return;
+  if (!window.confirm(t("session.confirm-delete"))) return;
   try {
     const response = await fetch(`/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
     if (!response.ok && response.status !== 404) throw new Error(`HTTP ${response.status}`);
     if (analysis?.meta.id === id) exitAnalysis();
     await refreshSessions();
-    showToast("Session supprimée");
+    showToast(t("toast.session-deleted"));
   } catch (error) {
     console.warn("Suppression impossible :", error);
-    showToast("Suppression impossible");
+    showToast(t("toast.delete-failed"));
   }
 }
+
+/** Épingle ou désépingle une session pour la soustraire à la purge. */
+async function keepSession(id, kept) {
+  try {
+    const response = await fetch(`/sessions/${encodeURIComponent(id)}/keep`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kept }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await refreshSessions();
+    showToast(kept ? t("toast.pinned") : t("toast.unpinned"));
+  } catch (error) {
+    console.warn("Épinglage impossible :", error);
+    showToast(t("toast.action-failed"));
+  }
+}
+
+/** Reflète l'état d'archivage renvoyé par le serveur dans la modale. */
+function applyRecordingState(enabled) {
+  if (recordingToggle) recordingToggle.checked = enabled;
+  if (recordingLabel) {
+    recordingLabel.textContent = enabled
+      ? t("session-list.recording-on")
+      : t("session-list.recording-off");
+  }
+}
+
+async function setRecording(enabled) {
+  try {
+    const response = await fetch("/recording", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    applyRecordingState(data.recording !== false);
+    showToast(enabled ? t("toast.recording-on") : t("toast.recording-off"));
+  } catch (error) {
+    console.warn("Changement d'archivage impossible :", error);
+    applyRecordingState(!enabled);
+    showToast(t("session-list.server-down"));
+  }
+}
+
+recordingToggle?.addEventListener("change", () => setRecording(recordingToggle.checked));
 
 sessionsButton.addEventListener("click", openSessions);
 sessionsCloseButton.addEventListener("click", closeSessions);
@@ -1284,6 +2244,8 @@ sessionsListEl.addEventListener("click", (event) => {
     loadSession(id);
   } else if (button.dataset.action === "delete") {
     deleteSession(id);
+  } else if (button.dataset.action === "keep") {
+    keepSession(id, button.dataset.kept !== "1");
   }
 });
 
@@ -1477,7 +2439,7 @@ async function loadSession(id) {
     enterAnalysis(session);
   } catch (error) {
     console.error("Chargement de la session impossible :", error);
-    showToast("Impossible de charger la session");
+    showToast(t("toast.load-failed"));
   }
 }
 
@@ -1498,15 +2460,19 @@ function enterAnalysis(session) {
   analysisBar.hidden = false;
   analysisTitleEl.textContent =
     session.meta.kind === "race"
-      ? `Course · ${session.meta.lapCount} ${session.meta.lapCount > 1 ? "tours" : "tour"} · ${formatClock(session.meta.duration)}`
-      : `Balade · ${formatClock(session.meta.duration)}`;
+      ? t("analysis.race", { n: session.meta.lapCount, time: formatClock(session.meta.duration) })
+      : t("analysis.free", { time: formatClock(session.meta.duration) });
   analysisRange.min = "0";
   analysisRange.max = String(Math.max(0.001, session.meta.duration));
   analysisRange.value = "0";
   analysisClockEl.textContent = "0:00.000";
-  mapSubEl.textContent = "Session archivée · cliquez sur le tracé";
+  mapSubEl.textContent = t("map.sub-analysis");
   clearTrailButton.disabled = true;
-  inspectorEl.hidden = false;
+  inspectorEl.hidden = panelState.inspector.hidden;
+  if (!inspectorEl.hidden) {
+    bringToFront(inspectorEl);
+    applyPanelLayout("inspector");
+  }
   app.classList.add("is-analysis");
 
   setFollow(false);
@@ -1527,7 +2493,7 @@ function exitAnalysis() {
 
   analysisBar.hidden = true;
   inspectorEl.hidden = true;
-  mapSubEl.textContent = "Position X / Y / Z en temps réel";
+  mapSubEl.textContent = t("map.sub-live");
   clearTrailButton.disabled = false;
   app.classList.remove("is-analysis");
   renderLapLegend(liveLaps, false);
@@ -1591,7 +2557,7 @@ function updateInspector(sample) {
     Math.round(Math.max(0, convertSpeed(get("speed")))),
   );
   inspectorEls.gear.textContent = gearLabel(get("gear"));
-  inspectorEls.rpm.textContent = Math.round(get("rpm")).toLocaleString(LOCALE);
+  inspectorEls.rpm.textContent = Math.round(get("rpm")).toLocaleString(uiLocale());
 
   const throttle = get("throttle") / 255;
   const brake = get("brake") / 255;
@@ -1633,7 +2599,10 @@ function updateInspector(sample) {
 
   const raceTime = get("raceTime");
   const sessionTime = get("time");
-  inspectorEls.clock.textContent = `Course ${raceTime > 0 ? formatLap(raceTime) : "—"} · ${formatClock(sessionTime)} de session`;
+  inspectorEls.clock.textContent = t("analysis.session-of", {
+    race: raceTime > 0 ? formatLap(raceTime) : "—",
+    session: formatClock(sessionTime),
+  });
 }
 
 function selectSample(index) {
@@ -1852,6 +2821,273 @@ const mapObserver = new ResizeObserver(resizeRenderer);
 mapObserver.observe(canvas.parentElement);
 resizeRenderer();
 
+/* ------------------------------- Thème */
+
+const THEME_KEY = "hud-fh6:theme";
+
+/**
+ * Ambiances proposées. `mode` détermine les couleurs dérivées (panneaux,
+ * texte, traits) : le fond et l'accent restent libres.
+ */
+const THEME_PRESETS = [
+  { id: "cyber", label: "theme.preset-cyber", mode: "dark", bg: "#05080d", accent: "#00e5ff" },
+  { id: "ember", label: "theme.preset-ember", mode: "dark", bg: "#0b0705", accent: "#ffb020" },
+  { id: "daylight", label: "theme.preset-daylight", mode: "light", bg: "#eef3f8", accent: "#0b7fb5" },
+];
+
+const themePresetsEl = $("theme-presets");
+const themeAccentInput = $("theme-accent");
+const themeBgInput = $("theme-bg");
+const gaugeToggle = $("gauge-toggle");
+const themeResetButton = $("theme-reset");
+const analogTicksEl = $("analog-ticks");
+const analogLabelsEl = $("analog-labels");
+const analogNeedleEl = $("analog-needle");
+const analogSpeedEl = $("analog-speed");
+const analogGearEl = $("analog-gear");
+const analogUnitEl = $("analog-unit");
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function parseHexColor(value) {
+  const clean = String(value ?? "").replace("#", "").trim();
+  const full =
+    clean.length === 3
+      ? clean
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : clean;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return { r: 0, g: 0, b: 0 };
+  const int = Number.parseInt(full, 16);
+  return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
+}
+
+function toHexColor({ r, g, b }) {
+  const hex = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  return `#${hex(r)}${hex(g)}${hex(b)}`;
+}
+
+function mixHex(a, b, amount) {
+  const from = parseHexColor(a);
+  const to = parseHexColor(b);
+  return toHexColor({
+    r: from.r + (to.r - from.r) * amount,
+    g: from.g + (to.g - from.g) * amount,
+    b: from.b + (to.b - from.b) * amount,
+  });
+}
+
+function rgbaHex(hex, alpha) {
+  const { r, g, b } = parseHexColor(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function hexLuminance(hex) {
+  const { r, g, b } = parseHexColor(hex);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+function defaultTheme() {
+  return {
+    mode: THEME_PRESETS[0].mode,
+    bg: THEME_PRESETS[0].bg,
+    accent: THEME_PRESETS[0].accent,
+    gauge: "digital",
+  };
+}
+
+function loadTheme() {
+  const fallback = defaultTheme();
+  try {
+    const stored = JSON.parse(localStorage.getItem(THEME_KEY) ?? "null");
+    if (!stored || typeof stored !== "object") return fallback;
+    return {
+      mode: stored.mode === "light" ? "light" : "dark",
+      bg: /^#[0-9a-fA-F]{6}$/.test(stored.bg ?? "") ? stored.bg : fallback.bg,
+      accent: /^#[0-9a-fA-F]{6}$/.test(stored.accent ?? "") ? stored.accent : fallback.accent,
+      gauge: stored.gauge === "analog" ? "analog" : "digital",
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+let themeState = loadTheme();
+
+function saveTheme() {
+  try {
+    localStorage.setItem(THEME_KEY, JSON.stringify(themeState));
+  } catch {
+    // Stockage indisponible : le thème vaut pour la session en cours.
+  }
+}
+
+/** Applique les couleurs du thème aux variables CSS et à la scène 3D. */
+function applyTheme() {
+  const root = document.documentElement;
+  const light = themeState.mode === "light";
+  const bg = themeState.bg;
+  const accent = themeState.accent;
+  const panel = light ? mixHex(bg, "#ffffff", 0.7) : mixHex(bg, "#ffffff", 0.06);
+  const panel2 = light ? mixHex(bg, "#ffffff", 0.95) : mixHex(bg, "#ffffff", 0.11);
+  const soft = light ? mixHex(accent, "#001220", 0.2) : mixHex(accent, "#ffffff", 0.32);
+
+  root.style.setProperty("--bg", bg);
+  root.style.setProperty("--bg-panel", rgbaHex(panel, 0.86));
+  root.style.setProperty("--bg-panel-2", rgbaHex(panel2, light ? 0.92 : 0.6));
+  root.style.setProperty("--accent", accent);
+  root.style.setProperty("--cyan", accent);
+  root.style.setProperty("--cyan-soft", soft);
+  root.style.setProperty("--stroke", rgbaHex(accent, light ? 0.32 : 0.16));
+  root.style.setProperty("--text", light ? "#0b1420" : "#eef6ff");
+  root.style.setProperty("--muted", light ? "#5c6b7c" : "#7f8ea3");
+  root.style.setProperty("--ink", light ? "#0b1420" : "#ffffff");
+  root.dataset.theme = light ? "light" : "dark";
+
+  const bgColor = new THREE.Color(bg);
+  scene.background = bgColor;
+  if (scene.fog) scene.fog.color.copy(bgColor);
+
+  themeAccentInput.value = accent;
+  themeBgInput.value = bg;
+  updateThemeSwatches();
+}
+
+function updateThemeSwatches() {
+  for (const button of themePresetsEl.querySelectorAll("button[data-preset]")) {
+    const preset = THEME_PRESETS.find((entry) => entry.id === button.dataset.preset);
+    const active =
+      Boolean(preset) &&
+      preset.bg.toLowerCase() === themeState.bg.toLowerCase() &&
+      preset.accent.toLowerCase() === themeState.accent.toLowerCase();
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+}
+
+function setTheme(patch, { persist = true } = {}) {
+  themeState = { ...themeState, ...patch };
+  if (patch.bg) themeState.mode = hexLuminance(themeState.bg) > 0.55 ? "light" : "dark";
+  applyTheme();
+  applyGaugeStyle();
+  if (persist) saveTheme();
+}
+
+function buildThemePresets() {
+  themePresetsEl.replaceChildren();
+  for (const preset of THEME_PRESETS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "theme-swatch";
+    button.dataset.preset = preset.id;
+    button.title = t(preset.label);
+    button.setAttribute("aria-label", t(preset.label));
+    button.style.background = `linear-gradient(135deg, ${preset.bg} 45%, ${preset.accent} 55%)`;
+    button.addEventListener("click", () => {
+      setTheme({ mode: preset.mode, bg: preset.bg, accent: preset.accent });
+    });
+    themePresetsEl.appendChild(button);
+  }
+  updateThemeSwatches();
+}
+
+/** Met à jour les libellés du menu Thème (langue + style de compteur). */
+function refreshThemeMenu() {
+  for (const button of themePresetsEl.querySelectorAll("button[data-preset]")) {
+    const preset = THEME_PRESETS.find((entry) => entry.id === button.dataset.preset);
+    if (!preset) continue;
+    button.title = t(preset.label);
+    button.setAttribute("aria-label", t(preset.label));
+  }
+  gaugeToggle.textContent =
+    themeState.gauge === "analog" ? t("gauge.analog") : t("gauge.digital");
+  gaugeToggle.dataset.gauge = themeState.gauge;
+}
+
+themeAccentInput.addEventListener("input", () => {
+  setTheme({ accent: themeAccentInput.value });
+});
+
+themeBgInput.addEventListener("input", () => {
+  setTheme({ bg: themeBgInput.value });
+});
+
+gaugeToggle.addEventListener("click", () => {
+  setTheme({ gauge: themeState.gauge === "analog" ? "digital" : "analog" });
+});
+
+themeResetButton.addEventListener("click", () => {
+  setTheme({ ...defaultTheme() });
+  showToast(t("menu.reset"));
+});
+
+/* ------------------------------- Compteur analogique */
+
+/** Vitesse maximale de l'échelle : ronde et adaptée au système d'unités. */
+function analogMaxSpeed() {
+  return isImperial() ? 200 : 320;
+}
+
+function analogAngle(ratio) {
+  return (-120 + clamp(ratio, 0, 1) * 240) * (Math.PI / 180);
+}
+
+function buildAnalogScale() {
+  const max = analogMaxSpeed();
+  const major = max / 8;
+  const minor = major / 4;
+  analogTicksEl.replaceChildren();
+  analogLabelsEl.replaceChildren();
+
+  for (let value = 0; value <= max + 0.001; value += minor) {
+    const isMajor = Math.abs(value % major) < 0.001;
+    const angle = analogAngle(value / max);
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+    const outer = 96;
+    const inner = isMajor ? 82 : 89;
+
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", (120 + sin * inner).toFixed(2));
+    line.setAttribute("y1", (120 - cos * inner).toFixed(2));
+    line.setAttribute("x2", (120 + sin * outer).toFixed(2));
+    line.setAttribute("y2", (120 - cos * outer).toFixed(2));
+    if (isMajor) line.setAttribute("class", "major");
+    analogTicksEl.appendChild(line);
+
+    if (isMajor) {
+      const text = document.createElementNS(SVG_NS, "text");
+      text.setAttribute("x", (120 + sin * 70).toFixed(2));
+      text.setAttribute("y", (120 - cos * 70 + 4).toFixed(2));
+      text.textContent = String(Math.round(value));
+      analogLabelsEl.appendChild(text);
+    }
+  }
+}
+
+/** Applique le style de compteur choisi (digital ou aiguille). */
+function applyGaugeStyle() {
+  cluster.dataset.gauge = themeState.gauge;
+  analogUnitEl.textContent = speedUnit();
+  const speed = latest
+    ? Math.max(0, Math.round(convertSpeed(smoothed.speed ?? latest.speed)))
+    : 0;
+  const ratio = clamp(speed / analogMaxSpeed(), 0, 1);
+  analogNeedleEl.style.transform = `rotate(${-120 + ratio * 240}deg)`;
+  analogSpeedEl.textContent = String(speed);
+  analogGearEl.textContent = latest ? gearLabel(latest.gear) : "N";
+  refreshThemeMenu();
+}
+
+function refreshAnalogScale() {
+  buildAnalogScale();
+  analogUnitEl.textContent = speedUnit();
+}
+
+buildThemePresets();
+applyTheme();
+applyGaugeStyle();
+buildAnalogScale();
+
 /* ------------------------------- Connexion SSE */
 
 function setConnection(state, text) {
@@ -1864,14 +3100,14 @@ function connect() {
   const source = new EventSource("/events");
 
   source.onopen = () => {
-    setConnection("idle", "En attente du flux Data Out");
+    setConnection("idle", t("status.waiting"));
   };
 
   source.onmessage = (event) => {
     try {
       const telemetry = JSON.parse(event.data);
       updateTelemetry(telemetry);
-      setConnection("live", "Data Out actif");
+      setConnection("live", t("status.live"));
     } catch (error) {
       console.warn("Paquet invalide ignoré", error);
     }
@@ -1888,16 +3124,19 @@ function connect() {
     sessionsCountEl.textContent = String(count + 1);
     if (meta.kind === "race") {
       showToast(
-        `Course enregistrée · ${meta.lapCount} tour(s) · meilleur ${meta.bestLap > 0 ? formatLap(meta.bestLap) : "—"}`,
+        t("toast.session-saved-race", {
+          n: meta.lapCount,
+          best: meta.bestLap > 0 ? formatLap(meta.bestLap) : "—",
+        }),
       );
     } else {
-      showToast("Balade enregistrée");
+      showToast(t("toast.session-saved-free"));
     }
     if (!sessionsModal.hidden) refreshSessions();
   });
 
   source.onerror = () => {
-    setConnection("error", "Serveur injoignable — reconnexion…");
+    setConnection("error", t("status.error"));
   };
 }
 
@@ -1915,13 +3154,21 @@ async function loadHealth() {
 setInterval(() => {
   if (!latest) return;
   if (performance.now() - lastPacketAt >= IDLE_TIMEOUT) {
-    setConnection("idle", "En attente du flux Data Out");
+    setConnection("idle", t("status.waiting"));
     if (performance.now() - lastPacketAt > 10_000) {
       latest = null;
       smoothed.initialized = false;
     }
   }
 }, 400);
+
+/* Le bouton FR/EN force la langue : elle ne suivra plus les unités. */
+langToggle.addEventListener("click", () => {
+  setLanguage(lang === "fr" ? "en" : "fr");
+});
+
+/* Langue initiale : choix mémorisé, sinon langue du navigateur. */
+applyLanguage({ rerender: false });
 
 applyUnitLabels();
 connect();
@@ -1975,6 +3222,12 @@ if (new URLSearchParams(location.search).has("debug")) {
     get units() {
       return unitSystem;
     },
+    get layout() {
+      return panelState;
+    },
+    get drag() {
+      return dragSession;
+    },
     setUnits: setUnitSystem,
     formatLength,
     formatTemperature,
@@ -1985,3 +3238,4 @@ if (new URLSearchParams(location.search).has("debug")) {
     refreshSessions,
   };
 }
+

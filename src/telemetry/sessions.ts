@@ -11,6 +11,14 @@
  *  - téléportation de plus de `teleportMeters` (déplacement rapide, changement
  *    de zone). Les deux positions n'ont alors aucune continuité spatiale.
  *
+ * À la clôture, une session qui n'a pas réellement roulé (moins de
+ * `minDistanceMeters` parcourus, moins de `minPackets` paquets ou moins de
+ * `minDurationSeconds` de données) est supprimée : les menus, l'atelier et les
+ * arrêts au stand ne laissent donc aucune archive.
+ *
+ * L'enregistrement peut être suspendu à chaud (`setRecording`) et une session
+ * peut être épinglée (`kept`) pour échapper à la purge automatique.
+ *
  * Fichiers produits dans `data/sessions/` :
  *  - `<id>.raw`  : paquets de 324 octets concaténés (source de vérité) ;
  *  - `<id>.json` : métadonnées (date, durée, tours, meilleur tour, distance…).
@@ -36,6 +44,10 @@ const DEFAULT_GAP_MS = 4000;
 const DEFAULT_TELEPORT_METERS = 800;
 const DEFAULT_MAX_SESSIONS = 40;
 const TIMESTAMP_RESET_MS = 1000;
+/** En dessous, la session n'a pas roulé : menus, atelier, arrêt au stand. */
+const DEFAULT_MIN_DISTANCE_METERS = 30;
+const DEFAULT_MIN_DURATION_SECONDS = 2;
+const DEFAULT_MIN_PACKETS = 60;
 const SAFE_ID = /^[A-Za-z0-9-]{1,80}$/;
 
 export interface LapInfo {
@@ -75,6 +87,8 @@ export interface SessionMeta {
   laps: LapInfo[];
   /** Taille du fichier brut en octets. */
   bytes: number;
+  /** Épinglée : jamais supprimée par la purge automatique. */
+  kept?: boolean;
 }
 
 export interface SessionPayload {
@@ -98,8 +112,20 @@ export interface SessionStoreOptions {
   maxSessions?: number;
   gapMs?: number;
   teleportMeters?: number;
+  /** En dessous de cette distance, la session est jetée à la clôture. */
+  minDistanceMeters?: number;
+  minDurationSeconds?: number;
+  minPackets?: number;
+  /** Enregistrement actif au démarrage. */
+  recording?: boolean;
   now?: () => number;
   onFinalized?: (meta: SessionMeta) => void;
+}
+
+export interface SessionStoreStats {
+  recording: boolean;
+  /** Sessions jetées faute de roulage depuis le démarrage. */
+  discarded: number;
 }
 
 interface ActiveSession {
@@ -272,8 +298,13 @@ export class SessionStore {
   private readonly maxSessions: number;
   private readonly gapMs: number;
   private readonly teleportMeters: number;
+  private readonly minDistanceMeters: number;
+  private readonly minDurationSeconds: number;
+  private readonly minPackets: number;
   private readonly now: () => number;
   private readonly onFinalized?: (meta: SessionMeta) => void;
+  private recordingEnabled: boolean;
+  private discardedCount = 0;
   private active: ActiveSession | null = null;
 
   constructor(options: SessionStoreOptions) {
@@ -281,12 +312,57 @@ export class SessionStore {
     this.maxSessions = options.maxSessions ?? DEFAULT_MAX_SESSIONS;
     this.gapMs = options.gapMs ?? DEFAULT_GAP_MS;
     this.teleportMeters = options.teleportMeters ?? DEFAULT_TELEPORT_METERS;
+    this.minDistanceMeters = options.minDistanceMeters ?? DEFAULT_MIN_DISTANCE_METERS;
+    this.minDurationSeconds = options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS;
+    this.minPackets = options.minPackets ?? DEFAULT_MIN_PACKETS;
+    this.recordingEnabled = options.recording ?? true;
     this.now = options.now ?? Date.now;
     this.onFinalized = options.onFinalized;
 
     mkdirSync(this.dir, { recursive: true });
     this.recover();
     this.prune();
+  }
+
+  get recording(): boolean {
+    return this.recordingEnabled;
+  }
+
+  get stats(): SessionStoreStats {
+    return { recording: this.recordingEnabled, discarded: this.discardedCount };
+  }
+
+  /** Suspend ou reprend l'archivage à chaud (le direct n'est pas affecté). */
+  setRecording(enabled: boolean): void {
+    if (enabled === this.recordingEnabled) return;
+    this.recordingEnabled = enabled;
+    if (!enabled) this.finalize();
+    console.log(`[sessions] enregistrement ${enabled ? "activé" : "suspendu"}`);
+  }
+
+  /** Épingle ou désépingle une session (les épinglées échappent à la purge). */
+  setKept(id: string, kept: boolean): SessionMeta | null {
+    if (!isSafeId(id)) return null;
+    const metaPath = join(this.dir, `${id}.json`);
+    if (!existsSync(metaPath)) return null;
+    try {
+      const meta = JSON.parse(readFileSync(metaPath, "utf8")) as SessionMeta;
+      meta.kept = kept;
+      writeFileSync(metaPath, JSON.stringify(meta));
+      return meta;
+    } catch (error) {
+      console.error(`[sessions] épinglage impossible (${id}) :`, error);
+      return null;
+    }
+  }
+
+  /** true si la session a réellement roulé (distance, durée et volume suffisants). */
+  private worthKeeping(distance: number, duration: number, packets: number): boolean {
+    return (
+      distance >= this.minDistanceMeters &&
+      duration >= this.minDurationSeconds &&
+      packets >= this.minPackets
+    );
   }
 
   get activeInfo(): ActiveSessionInfo | null {
@@ -302,6 +378,12 @@ export class SessionStore {
 
   push(telemetry: Telemetry, raw: Buffer): void {
     const now = this.now();
+
+    if (!this.recordingEnabled) {
+      // Rien n'est écrit : on clôt la session ouverte pour ne pas la prolonger.
+      if (this.active) this.finalize();
+      return;
+    }
 
     if (this.active && this.shouldRollover(this.active, telemetry, now)) {
       this.finalize();
@@ -495,11 +577,28 @@ export class SessionStore {
       return;
     }
 
+    const duration = Math.max(0, (active.lastTimestampMs - active.firstTimestampMs) / 1000);
+
+    // Menus, atelier, arrêt au stand : aucun roulage réel, rien à archiver.
+    if (!this.worthKeeping(active.distance, duration, active.packets)) {
+      this.discardedCount += 1;
+      try {
+        unlinkSync(join(this.dir, `${active.id}.raw`));
+      } catch (error) {
+        console.error(`[sessions] suppression impossible (${active.id}) :`, error);
+      }
+      console.log(
+        `[sessions] session ignorée : ${active.distance.toFixed(0)} m, ` +
+          `${duration.toFixed(1)} s, ${active.packets} paquets`,
+      );
+      return;
+    }
+
     const meta: SessionMeta = {
       id: active.id,
       startedAt: active.startedAt,
       endedAt: active.lastPacketAt,
-      duration: Math.max(0, (active.lastTimestampMs - active.firstTimestampMs) / 1000),
+      duration,
       packets: active.packets,
       kind: active.hasLapData ? "race" : "free",
       lapCount: active.laps.length,
@@ -537,7 +636,7 @@ export class SessionStore {
         const raw = readFileSync(rawPath);
         const endedAt = Math.round(statSync(rawPath).mtimeMs);
         const built = buildSession(id, raw, endedAt, endedAt, false);
-        if (built.count === 0) {
+        if (built.count === 0 || !this.worthKeeping(built.meta.distance, built.meta.duration, built.count)) {
           unlinkSync(rawPath);
           continue;
         }
@@ -550,10 +649,17 @@ export class SessionStore {
     }
   }
 
+  /**
+   * Purge les sessions les plus anciennes.
+   *
+   * Les sessions épinglées ne sont jamais supprimées : seules les
+   * `maxSessions` plus récentes **non épinglées** sont conservées, les autres
+   * sont effacées de la plus ancienne à la plus récente.
+   */
   private prune(): void {
-    const metas = this.list();
-    if (metas.length <= this.maxSessions) return;
-    for (const meta of metas.slice(this.maxSessions)) {
+    const removable = this.list().filter((meta) => !meta.kept);
+    if (removable.length <= this.maxSessions) return;
+    for (const meta of removable.slice(this.maxSessions)) {
       this.remove(meta.id);
     }
   }

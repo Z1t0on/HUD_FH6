@@ -14,3 +14,7 @@ vendor/
 
 # Enregistrements de sessions (données locales, jamais versionnées)
 data/
+
+# Journaux de developpement (jamais versionnes)
+*.log
+*.err

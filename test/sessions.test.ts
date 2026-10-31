@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -34,15 +34,50 @@ function makePacket(options: PacketOptions): Buffer {
   return buffer;
 }
 
-function makeStore(dir: string, options: { now: () => number; onFinalized?: (m: SessionMeta) => void }) {
+interface StoreOptions {
+  now: () => number;
+  onFinalized?: (m: SessionMeta) => void;
+  maxSessions?: number;
+  minDistanceMeters?: number;
+  minDurationSeconds?: number;
+  minPackets?: number;
+  recording?: boolean;
+}
+
+function makeStore(dir: string, options: StoreOptions) {
   return new SessionStore({
     dir,
     now: options.now,
     gapMs: 4000,
     teleportMeters: 800,
-    maxSessions: 40,
+    maxSessions: options.maxSessions ?? 40,
+    // Par défaut les tests historiques n'appliquent aucun seuil de roulage ;
+    // les tests dédiés au filtrage passent des valeurs explicites.
+    minDistanceMeters: options.minDistanceMeters ?? 0,
+    minDurationSeconds: options.minDurationSeconds ?? 0,
+    minPackets: options.minPackets ?? 0,
+    recording: options.recording,
     onFinalized: options.onFinalized,
   });
+}
+
+/** Envoie `count` paquets espacés de 16 ms, en avançant de `step` mètre(s). */
+function pushRun(
+  store: SessionStore,
+  clock: { value: number },
+  run: { timestampMs: number; count: number; step?: number },
+): void {
+  const step = run.step ?? 0;
+  for (let index = 0; index < run.count; index += 1) {
+    const packet = makePacket({
+      timestampMs: run.timestampMs + index * 16,
+      x: 0,
+      z: index * step,
+      speed: 20,
+    });
+    store.push(decodePacket(packet), packet);
+    clock.value += 16;
+  }
 }
 
 function tempDir(): string {
@@ -198,6 +233,129 @@ test("clôt une session inactive lors du balayage", () => {
   assert.equal(store.list().length, 1);
   assert.equal(store.activeInfo, null);
   assert.equal(store.list()[0]!.packets, 1);
+
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("jette une session qui n'a pas roulé (menus, atelier, arrêt)", () => {
+  const dir = tempDir();
+  const clock = { value: 10_000 };
+  const finalized: SessionMeta[] = [];
+  const store = makeStore(dir, {
+    now: () => clock.value,
+    minDistanceMeters: 30,
+    minDurationSeconds: 2,
+    minPackets: 60,
+    onFinalized: (meta) => finalized.push(meta),
+  });
+
+  // 200 paquets, 3,2 s de données, mais la voiture ne bouge pas d'un mètre.
+  pushRun(store, clock, { timestampMs: 900_000, count: 200 });
+  clock.value += 5000;
+  store.sweep();
+
+  assert.equal(store.list().length, 0);
+  assert.equal(finalized.length, 0);
+  assert.equal(store.stats.discarded, 1);
+  assert.deepEqual(readdirSync(dir), []);
+
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("garde une session qui a réellement roulé", () => {
+  const dir = tempDir();
+  const clock = { value: 10_000 };
+  const store = makeStore(dir, {
+    now: () => clock.value,
+    minDistanceMeters: 30,
+    minDurationSeconds: 2,
+    minPackets: 60,
+  });
+
+  pushRun(store, clock, { timestampMs: 950_000, count: 200, step: 1 });
+  clock.value += 5000;
+  store.sweep();
+
+  const sessions = store.list();
+  assert.equal(sessions.length, 1);
+  assert.ok(sessions[0]!.distance >= 199);
+  assert.equal(store.stats.discarded, 0);
+
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("suspend puis reprend l'enregistrement à chaud", () => {
+  const dir = tempDir();
+  const clock = { value: 10_000 };
+  const store = makeStore(dir, {
+    now: () => clock.value,
+    minDistanceMeters: 30,
+    minDurationSeconds: 2,
+    minPackets: 60,
+  });
+
+  store.setRecording(false);
+  assert.equal(store.recording, false);
+  pushRun(store, clock, { timestampMs: 1_000_000, count: 200, step: 1 });
+  clock.value += 5000;
+  store.sweep();
+  assert.equal(store.activeInfo, null);
+  assert.equal(store.list().length, 0);
+
+  store.setRecording(true);
+  pushRun(store, clock, { timestampMs: 1_100_000, count: 200, step: 1 });
+  clock.value += 5000;
+  store.sweep();
+  assert.equal(store.list().length, 1);
+
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("les sessions épinglées échappent à la purge automatique", () => {
+  const dir = tempDir();
+  const clock = { value: 10_000 };
+  const store = makeStore(dir, {
+    now: () => clock.value,
+    maxSessions: 1,
+    minDistanceMeters: 30,
+    minDurationSeconds: 2,
+    minPackets: 60,
+  });
+
+  const ids: string[] = [];
+  for (let run = 0; run < 3; run += 1) {
+    pushRun(store, clock, { timestampMs: 1_200_000 + run * 60_000, count: 200, step: 1 });
+    clock.value += 5000;
+    store.sweep();
+    const meta = store.list()[0];
+    assert.ok(meta);
+    ids.push(meta.id);
+  }
+  // Rétention d'une session : seule la plus récente subsiste.
+  assert.deepEqual(
+    store.list().map((meta) => meta.id),
+    [ids[2]!],
+  );
+
+  const pinned = store.setKept(ids[2]!, true);
+  assert.equal(pinned?.kept, true);
+  assert.equal(store.setKept("inconnue", true), null);
+
+  pushRun(store, clock, { timestampMs: 1_400_000, count: 200, step: 1 });
+  clock.value += 5000;
+  store.sweep();
+  const disposable = store.list().find((meta) => meta.id !== ids[2]!);
+  assert.ok(disposable, "une seconde session non épinglée est présente");
+
+  // Le roulage suivant purge la plus ancienne non épinglée, pas l'épinglée.
+  pushRun(store, clock, { timestampMs: 1_460_000, count: 200, step: 1 });
+  clock.value += 5000;
+  store.sweep();
+
+  const remaining = store.list().map((meta) => meta.id);
+  assert.ok(remaining.includes(ids[2]!), "la session épinglée est conservée");
+  assert.ok(!remaining.includes(disposable.id), "la plus ancienne non épinglée est purgée");
+  assert.equal(remaining.length, 2);
 
   rmSync(dir, { recursive: true, force: true });
 });

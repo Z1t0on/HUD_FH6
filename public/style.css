@@ -1,15 +1,17 @@
 :root {
+  --accent: #00e5ff;
   --bg: #05080d;
   --bg-panel: rgba(11, 17, 26, 0.82);
   --bg-panel-2: rgba(18, 27, 40, 0.6);
-  --stroke: rgba(0, 229, 255, 0.16);
-  --cyan: #00e5ff;
+  --stroke: color-mix(in srgb, var(--accent) 16%, transparent);
+  --cyan: var(--accent);
   --cyan-soft: #38d0ff;
   --amber: #ffb020;
   --red: #ff3b3b;
   --green: #2ee6a8;
   --text: #eef6ff;
-  --muted: #7f8ea3;
+  --muted: #5a718a;
+  --ink: #ffffff;
   --radius: 16px;
   --font: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
 }
@@ -28,9 +30,9 @@ body {
   width: 100%;
   min-height: 100%;
   background:
-    radial-gradient(circle at 15% 8%, rgba(0, 229, 255, 0.09), transparent 38%),
-    radial-gradient(circle at 88% 90%, rgba(255, 176, 32, 0.06), transparent 42%),
-    linear-gradient(150deg, #070d14, var(--bg) 55%, #04070b);
+    radial-gradient(circle at 15% 8%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 38%),
+    radial-gradient(circle at 88% 90%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 42%),
+    var(--bg);
   font-family: var(--font);
   color: var(--text);
   user-select: none;
@@ -75,7 +77,7 @@ body {
   letter-spacing: 0.04em;
   color: #041018;
   background: linear-gradient(135deg, var(--cyan), var(--cyan-soft) 55%, #0a9fc0);
-  box-shadow: 0 0 24px rgba(0, 229, 255, 0.35);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .brand-text h1 {
@@ -107,8 +109,8 @@ body {
   gap: 8px;
   padding: 7px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -146,7 +148,7 @@ body {
   padding: 7px 11px;
   border-radius: 8px;
   border: 1px solid var(--stroke);
-  background: rgba(0, 229, 255, 0.05);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
   font-size: 10px;
   letter-spacing: 0.1em;
   color: var(--cyan-soft);
@@ -159,12 +161,17 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.lang-btn {
+  min-width: 42px;
+  text-align: center;
+}
+
 .btn {
   appearance: none;
   padding: 7px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
   color: var(--text);
   font-family: inherit;
   font-size: 10px;
@@ -174,14 +181,32 @@ body {
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
 
+/* Amélioration de la visibilité des boutons dans les thèmes clairs */
+:root {
+  --btn-bg-light: rgba(255, 255, 255, 0.1);
+  --btn-border-light: rgba(255, 255, 255, 0.2);
+  --btn-text-light: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="light"] .btn:not(.is-active) {
+  background: var(--btn-bg-light);
+  border-color: var(--btn-border-light);
+  color: var(--btn-text-light);
+}
+
+[data-theme="light"] .btn:hover:not(.is-active) {
+  background: color-mix(in srgb, var(--accent) 15%, rgba(255, 255, 255, 0.1));
+  border-color: color-mix(in srgb, var(--accent) 60%, rgba(255, 255, 255, 0.3));
+}
+
 .btn:hover {
-  border-color: rgba(0, 229, 255, 0.45);
-  background: rgba(0, 229, 255, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .btn.is-active {
-  border-color: rgba(0, 229, 255, 0.55);
-  background: rgba(0, 229, 255, 0.14);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--cyan);
 }
 
@@ -190,22 +215,188 @@ body {
   cursor: not-allowed;
 }
 
-/* ---------------------------------- Grille principale */
+/* ---------------------------------- Espace de travail */
 
 .layout {
+  position: relative;
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(290px, 360px) minmax(0, 1fr) minmax(270px, 330px);
-  gap: 14px;
+  overflow: hidden;
 }
 
-.col {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-height: 0;
+/* Chaque panneau est une fenêtre libre : position et taille en px, posées
+   par le script depuis des fractions mémorisées (voir hud.js). */
+.layout > .panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 300px;
+  height: 220px;
+  min-width: 150px;
+  min-height: 110px;
+  overflow: hidden;
+  will-change: left, top, width, height;
 }
+
+/* Pendant une manipulation, la tuile garde son z-index inline : la règle ne
+   fixe plus de niveau, pour rester dans la plage 20–59 de la charte. */
+.layout > .panel.is-dragging,
+.layout > .panel.is-resizing {
+  transition: none;
+}
+
+.panel-chrome {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  z-index: 12;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.panel:hover > .panel-chrome,
+.panel:focus-within > .panel-chrome,
+.panel.is-dragging > .panel-chrome {
+  opacity: 1;
+}
+
+.panel-grip {
+  width: 34px;
+  height: 14px;
+  border-radius: 7px;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--ink) 32%, transparent) 1px, transparent 1.4px) center / 6px 6px,
+    color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+  cursor: grab;
+}
+
+.panel.is-dragging .panel-grip {
+  cursor: grabbing;
+}
+
+.panel-hide {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: rgba(5, 8, 13, 0.8);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.panel-hide:hover {
+  color: var(--red);
+  border-color: rgba(255, 59, 59, 0.45);
+}
+
+/* Poignées de redimensionnement : uniquement les quatre coins */
+.panel-resize {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  z-index: 12;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.panel-resize:hover {
+  opacity: 1;
+}
+
+/* Poignée en bas à droite */
+.panel-resize.br {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+
+.panel-resize.br::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--cyan);
+  border-bottom: 2px solid var(--cyan);
+  border-radius: 0 0 3px 0;
+  opacity: 0.6;
+}
+
+/* Poignée en bas à gauche */
+.panel-resize.bl {
+  left: 0;
+  bottom: 0;
+  cursor: nesw-resize;
+}
+
+.panel-resize.bl::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-left: 2px solid var(--cyan);
+  border-bottom: 2px solid var(--cyan);
+  border-radius: 0 0 0 3px;
+  opacity: 0.6;
+}
+
+/* Poignée en haut à droite */
+.panel-resize.tr {
+  right: 0;
+  top: 0;
+  cursor: nesw-resize;
+}
+
+.panel-resize.tr::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--cyan);
+  border-top: 2px solid var(--cyan);
+  border-radius: 3px 0 0 0;
+  opacity: 0.6;
+}
+
+/* Poignée en haut à gauche */
+.panel-resize.tl {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+
+.panel-resize.tl::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-left: 2px solid var(--cyan);
+  border-top: 2px solid var(--cyan);
+  border-radius: 0 3px 0 0;
+  opacity: 0.6;
+}
+
+.panel:hover > .panel-resize {
+  opacity: 1;
+}
+
 
 /* ---------------------------------- Panneaux */
 
@@ -217,8 +408,8 @@ body {
   border: 1px solid var(--stroke);
   box-shadow:
     0 18px 44px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 0 34px rgba(0, 229, 255, 0.025);
+    inset 0 1px 0 color-mix(in srgb, var(--ink) 5%, transparent),
+    inset 0 0 34px color-mix(in srgb, var(--accent) 2.5%, transparent);
   backdrop-filter: blur(14px) saturate(1.2);
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
 }
@@ -229,7 +420,7 @@ body {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: linear-gradient(120deg, transparent 25%, rgba(0, 229, 255, 0.05) 45%, transparent 62%);
+  background: linear-gradient(120deg, transparent 25%, color-mix(in srgb, var(--accent) 5%, transparent) 45%, transparent 62%);
 }
 
 .panel-head {
@@ -270,7 +461,7 @@ body {
   flex-direction: column;
   gap: 2px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
 }
 
 .lap-label {
@@ -285,7 +476,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 22px rgba(0, 229, 255, 0.3);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .lap-rows {
@@ -322,8 +513,8 @@ body {
   gap: 10px;
   padding: 6px 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
   transition: background 160ms ease, border-color 160ms ease;
 }
 
@@ -387,13 +578,13 @@ body {
   flex: 1;
   height: 7px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
   transition: background 60ms linear, box-shadow 60ms linear;
 }
 
 .shift-lights span.on {
   background: var(--cyan);
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.65);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 65%, transparent);
 }
 
 .shift-lights span.on:nth-last-child(-n + 3) {
@@ -427,7 +618,7 @@ body {
 
 .arc-track {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.07);
+  stroke: color-mix(in srgb, var(--ink) 7%, transparent);
   stroke-width: 9;
 }
 
@@ -442,7 +633,7 @@ body {
 
 .arc-cap {
   fill: #ffffff;
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ink) 90%, transparent));
   opacity: 0;
 }
 
@@ -482,7 +673,7 @@ body {
   line-height: 0.95;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 28px rgba(0, 229, 255, 0.2);
+  text-shadow: 0 0 28px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .speed-unit {
@@ -526,7 +717,7 @@ body {
   padding: 0;
   overflow: hidden;
   min-height: 0;
-  background: radial-gradient(ellipse at 50% 30%, rgba(0, 229, 255, 0.08), transparent 60%), #05080d;
+  background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%), var(--bg);
 }
 
 #scene {
@@ -671,7 +862,7 @@ body {
   gap: 1px;
   padding: 8px 10px;
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.035);
+  background: color-mix(in srgb, var(--ink) 3.5%, transparent);
   border: 1px solid color-mix(in srgb, var(--tire-color) 42%, transparent);
   box-shadow: inset 0 0 18px color-mix(in srgb, var(--tire-color) 10%, transparent);
   transition: border-color 200ms ease, box-shadow 200ms ease;
@@ -771,8 +962,8 @@ body {
 .pedal {
   position: relative;
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
   overflow: hidden;
   display: flex;
   align-items: flex-end;
@@ -787,8 +978,8 @@ body {
 }
 
 .pedal-throttle .pedal-fill {
-  background: linear-gradient(0deg, rgba(0, 229, 255, 0.7), rgba(0, 229, 255, 0.2));
-  box-shadow: 0 0 18px rgba(0, 229, 255, 0.35);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--accent) 70%, transparent), color-mix(in srgb, var(--accent) 20%, transparent));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .pedal-brake .pedal-fill {
@@ -806,7 +997,7 @@ body {
   bottom: 5px;
   font-size: 8px;
   letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.75);
+  color: color-mix(in srgb, var(--ink) 75%, transparent);
   z-index: 1;
 }
 
@@ -835,7 +1026,7 @@ body {
   border-radius: 10px;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 #gforce {
@@ -859,8 +1050,8 @@ body {
   height: 16px;
   padding: 0 5px;
   border-radius: 999px;
-  background: rgba(0, 229, 255, 0.16);
-  border: 1px solid rgba(0, 229, 255, 0.35);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   color: var(--cyan);
   font-size: 9px;
   font-variant-numeric: tabular-nums;
@@ -934,7 +1125,7 @@ body {
   gap: 10px;
   padding: 7px 10px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 229, 255, 0.24);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
   background: rgba(4, 7, 11, 0.85);
   backdrop-filter: blur(8px);
   pointer-events: auto;
@@ -965,19 +1156,13 @@ body {
   white-space: nowrap;
 }
 
-.inspector {
-  position: absolute;
-  right: 16px;
-  bottom: 118px;
-  z-index: 4;
-  width: min(330px, 46%);
+.inspector-panel {
   padding: 9px 11px 8px;
   border-radius: 12px;
-  border: 1px solid rgba(0, 229, 255, 0.24);
-  background: rgba(4, 7, 11, 0.9);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  background: rgba(4, 7, 11, 0.92);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
-  pointer-events: auto;
+  overflow: auto;
 }
 
 .inspector-head {
@@ -986,7 +1171,7 @@ body {
   justify-content: space-between;
   gap: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
   font-size: 9px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1126,7 +1311,7 @@ body {
 
 .inspector-foot {
   padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
   font-size: 8px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1139,11 +1324,11 @@ body {
 .modal {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 100;
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(2, 5, 8, 0.72);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
   backdrop-filter: blur(6px);
 }
 
@@ -1154,8 +1339,8 @@ body {
   max-height: 82vh;
   padding: 16px 18px;
   border-radius: 18px;
-  border: 1px solid rgba(0, 229, 255, 0.22);
-  background: linear-gradient(155deg, rgba(18, 27, 40, 0.96), rgba(11, 17, 26, 0.98) 60%);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--bg) 90%, var(--ink) 10%);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
 }
 
@@ -1165,7 +1350,7 @@ body {
   justify-content: space-between;
   gap: 16px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 .modal-head h2 {
@@ -1215,13 +1400,13 @@ body {
   gap: 10px 14px;
   padding: 9px 12px;
   border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 
 .session-row:hover {
-  border-color: rgba(0, 229, 255, 0.3);
-  background: rgba(0, 229, 255, 0.05);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .session-main {
@@ -1244,6 +1429,21 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--cyan-soft);
+}
+
+.session-badge {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--cyan-soft);
+  font-size: 7px;
+  letter-spacing: 0.14em;
+}
+
+.session-row.is-kept {
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .session-laps {
@@ -1295,7 +1495,7 @@ body {
 .modal-foot {
   margin: 0;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
   font-size: 8px;
   line-height: 1.5;
   letter-spacing: 0.04em;
@@ -1315,7 +1515,7 @@ body {
   max-width: min(560px, 88vw);
   padding: 9px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 229, 255, 0.35);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   background: rgba(4, 7, 11, 0.92);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
   font-size: 10px;
@@ -1333,17 +1533,268 @@ body {
 
 /* ---------------------------------- Responsive */
 
-@media (max-width: 1250px) {
-  .layout {
-    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(250px, 290px);
-  }
+/* ---------------------------------- Menus de la barre supérieure */
 
+.menu {
+  position: relative;
+}
+
+.menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu[open] > summary {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--text);
+}
+
+.menu-body {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  min-width: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: color-mix(in srgb, var(--bg) 92%, var(--ink) 8%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px);
+}
+
+.menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.menu-label {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.menu-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.menu-check:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.menu-check input {
+  accent-color: var(--cyan);
+}
+
+.btn-small {
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+.menu-reset {
+  margin-top: 2px;
+  width: 100%;
+}
+
+.theme-presets {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  cursor: pointer;
+}
+
+.theme-swatch[aria-pressed="true"] {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.menu-theme input[type="color"] {
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* ---------------------------------- Interrupteur (sessions) */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  transition: background 150ms ease;
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transition:
+    transform 150ms ease,
+    background 150ms ease;
+}
+
+.switch input:checked + .switch-track {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(16px);
+  background: var(--cyan);
+}
+
+.switch-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------------------------------- Compteur analogique */
+
+.analog {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+/* Le compteur affiché dépend du réglage « Digital / Analogique » : le SVG
+   n'est construit qu'une fois, seul l'affichage bascule. */
+.cluster[data-gauge="digital"] .analog {
+  display: none;
+}
+
+.cluster[data-gauge="analog"] .rpm-arc {
+  display: none;
+}
+
+.analog svg {
+  width: 100%;
+  height: 100%;
+}
+
+.analog-ticks line {
+  stroke: color-mix(in srgb, var(--ink) 20%, transparent);
+  stroke-width: 2;
+}
+
+.analog-ticks line.major {
+  stroke: var(--cyan-soft);
+  stroke-width: 3;
+  opacity: 0.85;
+}
+
+.analog-labels text {
+  fill: var(--muted);
+  font-family: var(--font);
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.analog-needle {
+  stroke: var(--amber);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transform-box: view-box;
+  transform-origin: 120px 120px;
+  filter: drop-shadow(0 0 6px rgba(255, 176, 32, 0.55));
+  transition: transform 60ms linear;
+}
+
+.analog-hub {
+  fill: var(--bg);
+  stroke: var(--amber);
+  stroke-width: 2;
+}
+
+.analog-center {
+  position: absolute;
+  left: 50%;
+  top: 64%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.analog-speed {
+  font-size: clamp(20px, 2.2vw, 34px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.analog-unit {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--muted);
+}
+
+.analog-gear {
+  margin-top: 4px;
+  font-size: 15px;
+  color: var(--cyan);
+  letter-spacing: 0.1em;
+}
+
+/* ---------------------------------- Adaptations d'écran */
+
+@media (max-width: 1250px) {
   .tire-legend {
     display: none;
   }
 }
 
-@media (max-width: 1000px) {
+/* Écrans étroits : retour à une pile verticale, les panneaux perdent leur
+   position libre (le glisser-déposer est désactivé côté script). */
+@media (max-width: 760px) {
   body {
     height: auto;
     overflow: auto;
@@ -1355,23 +1806,32 @@ body {
   }
 
   .layout {
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "map map"
-      "left right";
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: visible;
   }
 
-  .map-panel {
-    grid-area: map;
-    min-height: 52vh;
+  .layout > .panel {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0;
+    overflow: visible;
   }
 
-  .col-left {
-    grid-area: left;
+  .layout > .map-panel {
+    height: 52vh !important;
+    min-height: 320px;
   }
 
-  .col-right {
-    grid-area: right;
+  .inspector-panel {
+    height: auto !important;
+  }
+
+  .panel-chrome,
+  .panel-resize {
+    display: none;
   }
 
   .cluster {
@@ -1406,12 +1866,6 @@ body {
     top: 58px;
     padding-right: 8px;
     max-height: 22%;
-  }
-
-  .inspector {
-    right: 8px;
-    bottom: 126px;
-    width: min(300px, 78%);
   }
 
   .analysis-bar {
