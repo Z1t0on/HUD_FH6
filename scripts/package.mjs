@@ -1,8 +1,8 @@
 /**
  * Construit la distribution Windows : exécutable autonome + archive ZIP.
  *
- * Étapes : compilation TypeScript → bundle esbuild → pkg → dossier de
- * distribution → archive ZIP → empreintes SHA-256.
+ * Étapes : compilation TypeScript → bundle esbuild → pkg → icône PE →
+ * dossier de distribution → archive ZIP → empreintes SHA-256.
  *
  * Sortie : release/HUD-FH6-<version>-win-x64/ et release/HUD-FH6-<version>-win-x64.zip
  */
@@ -117,6 +117,15 @@ step("Vendorisation de Three.js", () => {
 step("Exécutable Windows (pkg)", () => {
   run(
     `npx pkg build/server.cjs --config package.json --targets node22-win-x64 --output "${EXE_PATH}"`,
+  );
+});
+
+step("Icône de l'exécutable", () => {
+  // pkg ne gère pas les icônes : les ressources PE sont remplacées après coup.
+  execFileSync(
+    process.execPath,
+    [join(ROOT, "scripts", "set-icon.mjs"), EXE_PATH, join(ROOT, "assets", "HUD.ico")],
+    { stdio: "inherit" },
   );
 });
 

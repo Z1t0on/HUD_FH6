@@ -1,0 +1,55 @@
+/* Base : variables, remise à zéro et structure de l'application. */
+:root {
+  --accent: #00e5ff;
+  --bg: #05080d;
+  --bg-panel: rgba(11, 17, 26, 0.82);
+  --bg-panel-2: rgba(18, 27, 40, 0.6);
+  --stroke: color-mix(in srgb, var(--accent) 16%, transparent);
+  --cyan: var(--accent);
+  --cyan-soft: #38d0ff;
+  --amber: #ffb020;
+  --red: #ff3b3b;
+  --green: #2ee6a8;
+  --text: #eef6ff;
+  --muted: #5a718a;
+  --ink: #ffffff;
+  --radius: 16px;
+  --font: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 15% 8%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 38%),
+    radial-gradient(circle at 88% 90%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 42%),
+    var(--bg);
+  font-family: var(--font);
+  color: var(--text);
+  user-select: none;
+}
+
+body {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: clamp(14px, 1.4vw, 22px);
+}
+
+

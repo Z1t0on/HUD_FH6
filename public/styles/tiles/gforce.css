@@ -1,0 +1,26 @@
+/* Tuile G-Force. */
+/* ---------------------------------- G-Force */
+
+.gforce-panel {
+  flex: 1;
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gforce-wrap {
+  flex: 1;
+  min-height: 90px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+#gforce {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+

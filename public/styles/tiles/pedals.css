@@ -1,0 +1,67 @@
+/* Tuile Commandes. */
+/* ---------------------------------- Pédales */
+
+.pedals-panel {
+  flex: 0 0 auto;
+}
+
+.pedals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  height: clamp(96px, 11vh, 132px);
+}
+
+.pedal {
+  position: relative;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.pedal-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 0%;
+  transition: height 45ms linear;
+}
+
+.pedal-throttle .pedal-fill {
+  background: linear-gradient(0deg, color-mix(in srgb, var(--accent) 70%, transparent), color-mix(in srgb, var(--accent) 20%, transparent));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.pedal-brake .pedal-fill {
+  background: linear-gradient(0deg, rgba(255, 59, 59, 0.7), rgba(255, 59, 59, 0.2));
+  box-shadow: 0 0 18px rgba(255, 59, 59, 0.35);
+}
+
+.pedal-clutch .pedal-fill {
+  background: linear-gradient(0deg, rgba(160, 108, 255, 0.7), rgba(160, 108, 255, 0.2));
+  box-shadow: 0 0 18px rgba(160, 108, 255, 0.3);
+}
+
+.pedal-label {
+  position: absolute;
+  bottom: 5px;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: color-mix(in srgb, var(--ink) 75%, transparent);
+  z-index: 1;
+}
+
+.pedal-value {
+  position: absolute;
+  top: 6px;
+  font-size: clamp(10px, 0.68vw, 12px);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  opacity: 0.9;
+  z-index: 1;
+}
+
+

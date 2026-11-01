@@ -28,6 +28,13 @@ données est le flux UDP officiel.
 - **Unités internationales** : bascule métrique ↔ impérial (km/h ↔ mph, °C ↔ °F,
   m ↔ ft/mi) via le bouton de la barre supérieure, détection automatique selon la
   langue du navigateur et préférence mémorisée
+- **Deux espaces de travail** : les tuiles se répartissent sur deux pages, rejoignables
+  par les flèches de la barre supérieure ; une tuile change d'espace en étant déposée
+  sur l'une d'elles, et sa position est mémorisée
+- **Compteur analogique** gradué jusqu'à **420 km/h** (280 mph) pour les voitures les
+  plus rapides, avec vitesse numérique sous le moyeu de l'aiguille
+- **Légende des tours** compacte : une seule ligne défilante, limitée aux 10 derniers
+  tours au direct (tous les tours restent accessibles en analyse)
 
 > La **pression des pneus n'est pas transmise** par le paquet FH6 : le HUD affiche
 > « Pression n/d » plutôt qu'une valeur inventée.
@@ -53,7 +60,7 @@ PC jeu (Forza Horizon 6)          PC HUD
 - `src/telemetry/sessions.ts` : enregistrement disque, segmentation en sessions,
   lecture en colonnes et purge
 - `src/server.ts` : HTTP, SSE, service des fichiers publics et de Three.js
-- `public/` : dashboard (HTML/CSS/JS, modules ES, import map Three.js)
+- `public/` : dashboard en tuiles autonomes (modules ES natifs, import map Three.js)
 - `tools/simulate.ts` : simulateur de flux pour tester sans le jeu
 
 Le format FH6 (324 octets) est identique au format « Dash » v2 de FH4/FH5 ; FH6 ajoute
@@ -114,8 +121,10 @@ npm run package
 ```
 
 La commande enchaîne la compilation TypeScript, le bundle esbuild (`build/server.cjs`),
-la copie figée de Three.js (`vendor/three/`), l'exécutable pkg, l'archive ZIP et les
-empreintes. Résultat dans `release/` :
+la copie figée de Three.js (`vendor/three/`), l'exécutable pkg, l'**icône du projet**
+(`assets/HUD.ico`), l'archive ZIP et les empreintes. pkg ne sachant pas appliquer
+d'icône, `scripts/set-icon.mjs` remplace les ressources PE de l'exécutable avec la
+bibliothèque `resedit`. Résultat dans `release/` :
 
 | Fichier                              | Contenu                                    |
 | ------------------------------------ | ------------------------------------------ |
@@ -237,8 +246,13 @@ fichier `.json` de métadonnées par session (tours, meilleur tour, distance, vo
 HUD_FH6/
 ├── Documentation/     # Doc Data Out et notes de recherche
 ├── data/sessions/     # Archives des courses (ignoré par Git)
-├── public/            # Dashboard (HTML, CSS, JS, import map Three.js)
-├── scripts/           # bundle.mjs (esbuild) et package.mjs (release Windows)
+├── public/            # Dashboard : coquille HTML + tuiles autonomes
+│   ├── index.html     #   barre supérieure, deux espaces, import map Three.js
+│   ├── hud.js         #   point d'entrée : SSE, distribution des paquets
+│   ├── core/          #   noyau partagé (état, bus, i18n, unités, fenêtres…)
+│   ├── tiles/         #   une tuile par fichier (chrono, compteur, carte…)
+│   └── styles/        #   une feuille par tuile, ordre de cascade dans l'HTML
+├── scripts/           # bundle.mjs, package.mjs (release), set-icon.mjs (icône PE)
 ├── src/
 │   ├── server.ts      # HTTP + SSE + UDP → navigateur
 │   └── telemetry/     # Décodeur, écouteur UDP, archives de sessions

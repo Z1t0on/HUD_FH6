@@ -1,0 +1,106 @@
+/* Tuile Pneus. */
+/* ---------------------------------- Pneus */
+
+.tires-panel {
+  flex: 0 0 auto;
+}
+
+.tire-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+
+.tire {
+  --tire-color: var(--muted);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--ink) 3.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tire-color) 42%, transparent);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--tire-color) 10%, transparent);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.tire[data-state="cold"] {
+  --tire-color: #38bdf8;
+}
+
+.tire[data-state="ideal"] {
+  --tire-color: #2ee6a8;
+}
+
+.tire[data-state="hot"] {
+  --tire-color: #ffb020;
+}
+
+.tire[data-state="overheat"] {
+  --tire-color: #ff3b3b;
+}
+
+.tire-corner {
+  font-size: clamp(8px, 0.55vw, 9px);
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
+.tire-temp {
+  font-size: clamp(17px, 1.3vw, 22px);
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--tire-color);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 16px color-mix(in srgb, var(--tire-color) 45%, transparent);
+}
+
+.tire-pressure {
+  font-size: clamp(7px, 0.5vw, 9px);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.tire-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: clamp(7px, 0.5vw, 9px);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.tire-legend span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.tire-legend span::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.tire-legend span[data-state="cold"]::before {
+  background: #38bdf8;
+}
+
+.tire-legend span[data-state="ideal"]::before {
+  background: #2ee6a8;
+}
+
+.tire-legend span[data-state="hot"]::before {
+  background: #ffb020;
+}
+
+.tire-legend span[data-state="overheat"]::before {
+  background: #ff3b3b;
+}
+
+

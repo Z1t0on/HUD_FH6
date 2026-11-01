@@ -1,0 +1,103 @@
+/* Adaptations d'écran : la dernière feuille chargée gagne. */
+/* ---------------------------------- Adaptations d'écran */
+
+@media (max-width: 1250px) {
+  .tire-legend {
+    display: none;
+  }
+}
+
+/* Écrans étroits : retour à une pile verticale, les panneaux perdent leur
+   position libre (le glisser-déposer est désactivé côté script). */
+@media (max-width: 760px) {
+  body {
+    height: auto;
+    overflow: auto;
+  }
+
+  .app {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: visible;
+  }
+
+  .layout > .panel {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .layout > .map-panel {
+    height: 52vh !important;
+    min-height: 320px;
+  }
+
+  .inspector-panel {
+    height: auto !important;
+  }
+
+  .panel-chrome,
+  .panel-resize {
+    display: none;
+  }
+
+  .cluster {
+    width: min(100%, 330px);
+  }
+}
+
+@media (max-height: 760px) {
+  .lap-time {
+    font-size: 24px;
+  }
+
+  .lap-rows {
+    padding: 4px 0;
+  }
+
+  .pedals {
+    height: 84px;
+  }
+
+  .cluster {
+    width: min(100%, 320px);
+  }
+
+  .gforce-panel {
+    min-height: 110px;
+  }
+}
+
+@media (max-width: 760px) {
+  .lap-legend {
+    top: 58px;
+    padding-right: 8px;
+    max-height: 22%;
+  }
+
+  .analysis-bar {
+    flex-wrap: wrap;
+  }
+
+  .analysis-range {
+    order: 5;
+    flex-basis: 100%;
+  }
+
+  .session-row {
+    grid-template-columns: 1fr;
+  }
+
+  .session-actions {
+    justify-content: flex-end;
+  }
+}
+

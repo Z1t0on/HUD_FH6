@@ -1,0 +1,101 @@
+/* Tuile Chrono. */
+/* ---------------------------------- Chrono */
+
+.lap-panel {
+  flex: 0 0 auto;
+}
+
+.lap-current {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.lap-label {
+  font-size: clamp(9px, 0.58vw, 10px);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lap-time {
+  font-size: clamp(25px, 2vw, 34px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.lap-rows {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.lap-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: clamp(10px, 0.7vw, 12px);
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lap-row b {
+  color: var(--text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.lap-row b.best {
+  color: var(--amber);
+}
+
+.delta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.delta-label {
+  font-size: clamp(8px, 0.55vw, 10px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.delta b {
+  font-size: clamp(14px, 1vw, 17px);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.delta[data-state="negative"] {
+  background: rgba(46, 230, 168, 0.1);
+  border-color: rgba(46, 230, 168, 0.35);
+}
+
+.delta[data-state="negative"] b {
+  color: var(--green);
+}
+
+.delta[data-state="positive"] {
+  background: rgba(255, 59, 59, 0.1);
+  border-color: rgba(255, 59, 59, 0.35);
+}
+
+.delta[data-state="positive"] b {
+  color: var(--red);
+}
+
+

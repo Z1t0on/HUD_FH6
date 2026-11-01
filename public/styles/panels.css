@@ -1,0 +1,54 @@
+/* Socle commun des tuiles : panneau, en-tête, titre. */
+/* ---------------------------------- Panneaux */
+
+.panel {
+  position: relative;
+  padding: clamp(10px, 0.85vw, 15px) clamp(12px, 0.95vw, 17px);
+  border-radius: var(--radius);
+  background: linear-gradient(155deg, var(--bg-panel-2), var(--bg-panel) 55%);
+  border: 1px solid var(--stroke);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 color-mix(in srgb, var(--ink) 5%, transparent),
+    inset 0 0 34px color-mix(in srgb, var(--accent) 2.5%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+}
+
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 25%, color-mix(in srgb, var(--accent) 5%, transparent) 45%, transparent 62%);
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.panel-title {
+  font-size: clamp(9px, 0.62vw, 11px);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--cyan-soft);
+  opacity: 0.9;
+}
+
+.lap-count,
+.map-position,
+.tire-note,
+.gforce-readout {
+  font-size: clamp(9px, 0.6vw, 11px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+

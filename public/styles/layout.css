@@ -1,0 +1,185 @@
+/* Espace de travail et fenêtres flottantes : cadre, poignées, ancrage. */
+/* ---------------------------------- Espace de travail */
+
+.layout {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Chaque panneau est une fenêtre libre : position et taille en px, posées
+   par le script depuis des fractions mémorisées (voir hud.js). */
+.layout > .panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 300px;
+  height: 220px;
+  min-width: 150px;
+  min-height: 110px;
+  overflow: hidden;
+  will-change: left, top, width, height;
+}
+
+/* Pendant une manipulation, la tuile garde son z-index inline : la règle ne
+   fixe plus de niveau, pour rester dans la plage 20–59 de la charte. */
+.layout > .panel.is-dragging,
+.layout > .panel.is-resizing {
+  transition: none;
+}
+
+.panel-chrome {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  z-index: 12;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.panel:hover > .panel-chrome,
+.panel:focus-within > .panel-chrome,
+.panel.is-dragging > .panel-chrome {
+  opacity: 1;
+}
+
+.panel-grip {
+  width: 34px;
+  height: 14px;
+  border-radius: 7px;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--ink) 32%, transparent) 1px, transparent 1.4px) center / 6px 6px,
+    color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+  cursor: grab;
+}
+
+.panel.is-dragging .panel-grip {
+  cursor: grabbing;
+}
+
+.panel-hide {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: rgba(5, 8, 13, 0.8);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.panel-hide:hover {
+  color: var(--red);
+  border-color: rgba(255, 59, 59, 0.45);
+}
+
+/* Poignées de redimensionnement : uniquement les quatre coins */
+.panel-resize {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  z-index: 12;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.panel-resize:hover {
+  opacity: 1;
+}
+
+/* Poignée en bas à droite */
+.panel-resize.br {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+
+.panel-resize.br::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--cyan);
+  border-bottom: 2px solid var(--cyan);
+  border-radius: 0 0 3px 0;
+  opacity: 0.6;
+}
+
+/* Poignée en bas à gauche */
+.panel-resize.bl {
+  left: 0;
+  bottom: 0;
+  cursor: nesw-resize;
+}
+
+.panel-resize.bl::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-left: 2px solid var(--cyan);
+  border-bottom: 2px solid var(--cyan);
+  border-radius: 0 0 0 3px;
+  opacity: 0.6;
+}
+
+/* Poignée en haut à droite */
+.panel-resize.tr {
+  right: 0;
+  top: 0;
+  cursor: nesw-resize;
+}
+
+.panel-resize.tr::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--cyan);
+  border-top: 2px solid var(--cyan);
+  border-radius: 3px 0 0 0;
+  opacity: 0.6;
+}
+
+/* Poignée en haut à gauche */
+.panel-resize.tl {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+
+.panel-resize.tl::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-left: 2px solid var(--cyan);
+  border-top: 2px solid var(--cyan);
+  border-radius: 0 3px 0 0;
+  opacity: 0.6;
+}
+
+.panel:hover > .panel-resize {
+  opacity: 1;
+}
+
+
+

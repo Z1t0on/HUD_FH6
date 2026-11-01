@@ -1,0 +1,165 @@
+/* Tuile Inspecteur. */
+.inspector-panel {
+  padding: 9px 11px 8px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  background: rgba(4, 7, 11, 0.92);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  overflow: auto;
+}
+
+.inspector-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan-soft);
+}
+
+.inspector-laptime {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.inspector-main {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1.2fr;
+  gap: 6px;
+  align-items: end;
+  padding: 7px 0 5px;
+}
+
+.inspector-speed {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.inspector-speed b {
+  font-size: clamp(24px, 2.2vw, 32px);
+  line-height: 0.9;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector-speed span,
+.inspector-cell span {
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.inspector-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.inspector-cell b {
+  font-size: clamp(14px, 1.15vw, 18px);
+  font-weight: 600;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector-pedals,
+.inspector-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 8px;
+  padding: 4px 0;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector-pedals span,
+.inspector-meta span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.inspector-meta b {
+  margin-left: auto;
+}
+
+.inspector-pedals b,
+.inspector-meta b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.inspector-tires {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.inspector-tires span {
+  --tire-color: var(--muted);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0 6px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--tire-color) 35%, transparent);
+  background: color-mix(in srgb, var(--tire-color) 8%, transparent);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.inspector-tires span b {
+  justify-self: end;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tire-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector-tires span i {
+  grid-column: 1 / -1;
+  font-style: normal;
+  font-size: 7px;
+  opacity: 0.7;
+}
+
+.inspector-tires span[data-state="cold"] {
+  --tire-color: #38bdf8;
+}
+
+.inspector-tires span[data-state="ideal"] {
+  --tire-color: #2ee6a8;
+}
+
+.inspector-tires span[data-state="hot"] {
+  --tire-color: #ffb020;
+}
+
+.inspector-tires span[data-state="overheat"] {
+  --tire-color: #ff3b3b;
+}
+
+.inspector-foot {
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+
