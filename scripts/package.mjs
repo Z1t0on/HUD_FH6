@@ -27,7 +27,7 @@ const VERSION = pkgJson.version;
 const TARGET = "win-x64";
 const BASE_NAME = `HUD-FH6-${VERSION}-${TARGET}`;
 
-const RELEASE_DIR = join(ROOT, "release");
+const RELEASE_DIR = join(ROOT, "release_dist");
 const STAGE_DIR = join(RELEASE_DIR, BASE_NAME);
 const EXE_NAME = "HUD_FH6.exe";
 const EXE_PATH = join(STAGE_DIR, EXE_NAME);

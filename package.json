@@ -16,8 +16,7 @@
   "pkg": {
     "assets": [
       "public/**/*",
-      "assets/**/*",
-      "vendor/**/*"
+      "assets/**/*"
     ],
     "targets": [
       "node22-win-x64"
