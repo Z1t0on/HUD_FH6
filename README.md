@@ -1,9 +1,9 @@
 # HUD_FH6 — HUD de télémétrie pour Forza Horizon 6
 
 Dashboard de télémétrie en temps réel pour **Forza Horizon 6**, alimenté par le flux
-officiel **Data Out** (UDP). Le HUD tourne dans un navigateur, sur un **second PC du
-réseau local** : le jeu envoie ses paquets à ce PC, qui les décode et les pousse au
-dashboard via SSE.
+officiel **Data Out** (UDP). Le HUD tourne dans un navigateur, **sur le PC de jeu ou sur
+un second PC du réseau local** : le jeu envoie ses paquets au serveur, qui les décode et
+les pousse au dashboard via SSE.
 
 Aucun accès mémoire au jeu, aucune modification de ses fichiers : la seule source de
 données est le flux UDP officiel.
@@ -31,6 +31,19 @@ données est le flux UDP officiel.
 - **Deux espaces de travail** : les tuiles se répartissent sur deux pages, rejoignables
   par les flèches de la barre supérieure ; une tuile change d'espace en étant déposée
   sur l'une d'elles, et sa position est mémorisée
+- **Fenêtres flottantes** : chaque tuile se déplace librement, se redimensionne par ses
+  **quatre coins**, se superpose à ses voisines et passe au premier plan au clic ;
+  aimantation à **12 px** des bords et des tuiles voisines, taille minimale 150 × 110 px
+- **Disposition mémorisée** : position, taille, espace d'appartenance et visibilité de
+  chaque tuile sont conservés dans le navigateur et réappliqués au lancement
+- **Menu Panneaux** : afficher ou masquer une tuile à la volée, réinitialiser la
+  disposition d'usine
+- **Thèmes** : trois ambiances (Cyber, Ember, Daylight clair), accent et fond
+  personnalisables, compteur **digital ou analogique**, réinitialisation
+- **Bilingue FR / EN** : bascule instantanée de toute l'interface, **indépendante** du
+  système d'unités (français + mph ou anglais + km/h restent possibles)
+- **Archivage pilotable** : interrupteur d'enregistrement dans la fenêtre Sessions et
+  épinglage d'une session pour la soustraire à la purge automatique
 - **Compteur analogique** gradué jusqu'à **420 km/h** (280 mph) pour les voitures les
   plus rapides, avec vitesse numérique sous le moyeu de l'aiguille
 - **Légende des tours** compacte : une seule ligne défilante, limitée aux 10 derniers
@@ -86,22 +99,14 @@ npm run sim
 Le simulateur envoie des paquets à `127.0.0.1:9999` à 60 Hz et simule un tour de
 circuit avec altitude, rapports, pédales, températures et chronos.
 
-## Comment le configurer sur le même PC :
-
-1. Lancez le HUD sur votre ordinateur (via l'exécutable HUD_FH6.exe ou avec la commande npm run dev).
-2. Ouvrez votre navigateur internet sur ce même PC et allez à l'adresse : http://localhost:3000.
-3. Dans les paramètres de Forza Horizon 6, rendez-vous dans Paramètres > ATH et gameplay > Data Out et entrez les valeurs suivantes :
-	- Data Out : ON
-	- Adresse IP : 127.0.0.1 (il s'agit de l'adresse de "bouclage local" ou localhost, qui indique au jeu d'envoyer les données à la machine elle-même plutôt qu'à travers le réseau).
-	- Port : 9999.
-
 ## Version portable (Windows x64)
 
 Pour le PC d'affichage, la [page des releases](https://github.com/Z1t0on/HUD_FH6/releases)
 fournit un exécutable autonome : **aucune installation de Node.js n'est nécessaire**.
 
-1. Télécharger `HUD-FH6-<version>-win-x64.zip` et l'extraire dans un dossier inscriptible
-   (par exemple `C:\HUD_FH6`), ou récupérer directement `HUD_FH6.exe`.
+1. Télécharger `HUD-FH6-<version>-win-x64.zip` et l'extraire **en entier** dans un dossier
+   inscriptible (par exemple `C:\HUD_FH6`) : l'archive contient `HUD_FH6.exe`, le dossier
+   `vendor\` (Three.js, requis par la carte 3D) et la documentation.
 2. Double-cliquer sur `HUD_FH6.exe` : une console affiche l'adresse du dashboard
    (`http://localhost:3000`) et l'IPv4 du PC à saisir dans le jeu.
 3. Ouvrir cette adresse dans un navigateur ; configurer Forza comme plus bas.
@@ -121,26 +126,38 @@ npm run package
 ```
 
 La commande enchaîne la compilation TypeScript, le bundle esbuild (`build/server.cjs`),
-la copie figée de Three.js (`vendor/three/`), l'exécutable pkg, l'**icône du projet**
-(`assets/HUD.ico`), l'archive ZIP et les empreintes. pkg ne sachant pas appliquer
-d'icône, `scripts/set-icon.mjs` remplace les ressources PE de l'exécutable avec la
-bibliothèque `resedit`. Résultat dans `release/` :
+l'**icône du projet** (`assets/HUD.ico`) appliquée au binaire Node de base, la copie
+figée de Three.js (`vendor/three/`, livrée à côté de l'exécutable), l'exécutable pkg,
+l'archive ZIP et les empreintes. pkg ne sachant pas appliquer d'icône,
+`scripts/set-icon.mjs` remplace les ressources PE — **avant** l'empaquetage : pkg
+ajoute son payload à la fin du binaire et y inscrit des offsets absolus qu'une
+réécriture du PE après coup rendrait invalides. Résultat dans `release_dist/` :
 
 | Fichier                              | Contenu                                    |
 | ------------------------------------ | ------------------------------------------ |
 | `HUD-FH6-<version>-win-x64/HUD_FH6.exe` | exécutable autonome (Node 22 embarqué)  |
-| `HUD-FH6-<version>-win-x64.zip`      | l'exécutable + `LISEZ-MOI.txt` + `README.md` |
+| `HUD-FH6-<version>-win-x64/vendor/`  | Three.js servi au navigateur (carte 3D)    |
+| `HUD-FH6-<version>-win-x64.zip`      | l'exécutable + `vendor/` + `LISEZ-MOI.txt` + `README.md` |
 | `SHA256SUMS.txt`                     | empreintes des deux fichiers ci-dessus     |
+
+Le dossier `vendor/` doit rester à côté de l'exécutable : déplacer le seul `.exe`
+laisse la carte 3D vide (le serveur le signale au démarrage).
 
 ## Configuration dans Forza Horizon 6
 
-1. Lancer le HUD sur le PC d'affichage (`npm run dev`).
-2. Relever l'IPv4 de ce PC avec `ipconfig` (le serveur l'affiche aussi au démarrage).
-3. Dans le jeu : **Paramètres > ATH et gameplay > Data Out**
-   - Data Out : **ON**
-   - IP : IPv4 du PC HUD (par exemple `192.168.1.42`)
-   - Port : **9999** — éviter la plage 5200–5300, réservée par le jeu
-4. Si nécessaire, autoriser le port UDP 9999 dans le pare-feu Windows du PC HUD :
+Le HUD fonctionne aussi bien **sur le PC de jeu** que sur un **second PC** du réseau
+local. Dans les deux cas, tout se règle dans **Paramètres > ATH et gameplay > Data Out** :
+
+| Installation du HUD | Adresse IP à saisir dans le jeu |
+| ------------------- | ------------------------------- |
+| Sur le PC de jeu | `127.0.0.1` (bouclage local) |
+| Sur un second PC du réseau | IPv4 du PC HUD, relevée avec `ipconfig` (le serveur l'affiche aussi au démarrage, par exemple `192.168.1.42`) |
+
+- Data Out : **ON**
+- Port : **9999** — éviter la plage 5200–5300, réservée par le jeu
+- Ouvrir ensuite <http://localhost:3000> sur le PC qui exécute le HUD
+
+Sur un second PC, autoriser le port UDP 9999 dans le pare-feu Windows du PC HUD :
 
 ```powershell
 New-NetFirewallRule -DisplayName "HUD FH6 Data Out" -Direction Inbound -Protocol UDP -LocalPort 9999 -Action Allow
@@ -168,6 +185,32 @@ npm run dev
 | `npm run bundle` | bundle CommonJS du serveur (`build/`)       |
 | `npm run package`| distribution Windows : exe, ZIP, SHA-256     |
 
+## Interface et disposition
+
+Le dashboard est un **bureau de fenêtres flottantes** : les tuiles ne sont pas figées
+dans une grille.
+
+| Action | Effet |
+| ------ | ----- |
+| Glisser la barre de titre | déplacer la tuile librement (elle peut recouvrir ses voisines) |
+| Glisser un **coin** | redimensionner (taille minimale 150 × 110 px, jamais hors de l'espace) |
+| Clic sur une tuile | la faire passer au premier plan |
+| Flèches `‹` / `›` | changer d'espace de travail (2 espaces) |
+| Déposer une tuile sur une flèche | la déplacer vers l'autre espace |
+| Croix de la barre de titre | masquer la tuile |
+| Menu **Panneaux** | réafficher une tuile, réinitialiser la disposition |
+| Bouton **Plein écran** | passer le dashboard en plein écran |
+
+L'aimantation aligne la tuile sur les bords de l'espace et sur les arêtes des voisines
+à moins de **12 px**, sans jamais empêcher le recouvrement. Les quatre coins portent
+seuls une poignée de redimensionnement.
+
+Tout est mémorisé dans `localStorage` (clé `hud-fh6:layout`) : position et taille en
+**fractions** de l'espace de travail (donc indépendantes de la résolution), espace
+d'appartenance et visibilité. La disposition est réappliquée au rechargement et
+recalculée à chaque redimensionnement de fenêtre. En dessous de 760 px de large, les
+tuiles repassent en pile et le déplacement libre est désactivé.
+
 ## Carte 3D
 
 | Action              | Effet                                              |
@@ -178,6 +221,7 @@ npm run dev
 | **Vue iso**         | replace la caméra en vue isométrique derrière elle |
 | **Vue d'ensemble**  | cadre tout le tracé (caméra libre)                 |
 | **Effacer tracé**   | remet le tracé à zéro                              |
+| **Retour au direct**| quitte l'analyse d'une session archivée            |
 
 Le tracé est construit à partir des positions reçues : il ne représente que le trajet
 parcouru depuis l'ouverture du dashboard. La ligne verticale et le repère au sol
@@ -201,6 +245,21 @@ Myanmar → impérial). Le choix manuel est mémorisé dans `localStorage`
 (`hud-fh6:units`). Les données archivées restent brutes (m/s, °F, mètres) : seuls
 l'affichage et les unités de l'interface changent.
 
+## Langue et thèmes
+
+**Langue** : le bouton `FR` / `EN` de la barre supérieure bascule toute l'interface
+(libellés, en-têtes, infobulles, notifications) sans rechargement. La langue de départ
+suit celle du navigateur ; le choix est mémorisé (`hud-fh6:lang`). Langue et système
+d'unités sont **deux réglages indépendants** : le français peut s'afficher en mph/°F et
+l'anglais en km/h/°C.
+
+**Thème** : le menu `Thème` propose trois ambiances — **Cyber** (sombre, cyan),
+**Ember** (sombre, ambre) et **Daylight** (clair) — ainsi que la couleur d'accent, la
+couleur de fond, le style de compteur (**digital** ou **analogique**) et une
+réinitialisation. La scène 3D et le compte-tours suivent le thème en direct. Le réglage
+est mémorisé (`hud-fh6:theme`) et les textes secondaires (`--muted`) restent lisibles
+dans chaque ambiance.
+
 ## Sessions et analyse
 
 Le serveur archive **toutes** les données de roulage, y compris en monde libre : les
@@ -210,10 +269,15 @@ fichier `.json` de métadonnées par session (tours, meilleur tour, distance, vo
 - Une session démarre au premier paquet et se ferme après **4 s** sans données, un
   changement d'horodatage du jeu (replay, téléportation) ou un saut de position de plus
   de 800 m.
-- Les **40 sessions** les plus récentes sont conservées ; les plus anciennes sont
-  supprimées automatiquement.
+- Les **40 sessions** non épinglées les plus récentes sont conservées ; les plus
+  anciennes sont supprimées automatiquement. Une session **épinglée** (`📌`) échappe à
+  la purge.
 - Le bouton **Sessions** liste les archives (date, durée, tours, meilleur tour) et
-  permet de les analyser ou de les supprimer.
+  permet de les analyser, de les épingler ou de les supprimer. Il porte aussi
+  l'**interrupteur d'enregistrement** : l'archivage peut être suspendu à chaud sans
+  couper le HUD, et le choix est conservé dans `data/settings.json`.
+- Une session qui n'a pas réellement roulé (menus, atelier, arrêt) est jetée : seuils
+  de **30 m**, **2 s** et **60 paquets** (réglables par variables d'environnement).
 - En mode analyse, la carte 3D affiche le tracé complet coloré par tour, la légende
   permet d'isoler un tour, et un **clic sur le tracé** fige les instruments sur
   l'instant correspondant. Le curseur de temps et les flèches du clavier déplacent
@@ -229,27 +293,34 @@ fichier `.json` de métadonnées par session (tours, meilleur tour, distance, vo
 | `GET /health`              | état du flux (paquets, dernier paquet, sessions)             |
 | `GET /sessions`            | liste des sessions archivées + session en cours              |
 | `GET /sessions/:id/data`   | session en colonnes (`FH6S` + en-tête JSON + Float32)        |
+| `POST /sessions/:id/keep`  | épingle ou désépingle une session (`{ "kept": true }`)       |
 | `DELETE /sessions/:id`     | suppression d'une session                                    |
+| `POST /recording`          | active/suspend l'archivage (`{ "enabled": false }`)          |
 
 ### Variables d'environnement
 
-| Variable           | Défaut              | Rôle                                   |
-| ------------------ | ------------------- | -------------------------------------- |
-| `UDP_PORT`         | `9999`              | port d'écoute Data Out                 |
-| `HUD_PORT`         | `3000`              | port HTTP du dashboard                 |
-| `HUD_SESSIONS_DIR` | `data/sessions`     | dossier d'archivage des sessions       |
-| `HUD_SESSION_KEEP` | `40`                | nombre de sessions conservées          |
+| Variable                    | Défaut          | Rôle                                   |
+| --------------------------- | --------------- | -------------------------------------- |
+| `UDP_PORT`                  | `9999`          | port d'écoute Data Out                 |
+| `HUD_PORT`                  | `3000`          | port HTTP du dashboard                 |
+| `HUD_SESSIONS_DIR`          | `data/sessions` | dossier d'archivage des sessions       |
+| `HUD_SESSION_KEEP`          | `40`            | nombre de sessions conservées          |
+| `HUD_RECORD`                | `1`             | archivage actif au démarrage (`0` = non) |
+| `HUD_SESSION_MIN_DISTANCE`  | `30`            | distance minimale archivée (m)         |
+| `HUD_SESSION_MIN_DURATION`  | `2`             | durée minimale archivée (s)            |
+| `HUD_SESSION_MIN_PACKETS`   | `60`            | paquets minimaux archivés              |
 
 ## Structure
 
 ```
 HUD_FH6/
+├── .opencode/skills/  # Skill fh6-data-out (référence du paquet UDP)
 ├── Documentation/     # Doc Data Out et notes de recherche
 ├── data/sessions/     # Archives des courses (ignoré par Git)
 ├── public/            # Dashboard : coquille HTML + tuiles autonomes
 │   ├── index.html     #   barre supérieure, deux espaces, import map Three.js
 │   ├── hud.js         #   point d'entrée : SSE, distribution des paquets
-│   ├── core/          #   noyau partagé (état, bus, i18n, unités, fenêtres…)
+│   ├── core/          #   noyau partagé (état, bus, i18n, unités, thème, fenêtres…)
 │   ├── tiles/         #   une tuile par fichier (chrono, compteur, carte…)
 │   └── styles/        #   une feuille par tuile, ordre de cascade dans l'HTML
 ├── scripts/           # bundle.mjs, package.mjs (release), set-icon.mjs (icône PE)
@@ -263,7 +334,9 @@ HUD_FH6/
 └── README.md
 ```
 
-`vendor/three/` et `release/` sont générés par `npm run package` et ignorés par Git.
+`vendor/three/` (à la racine, en développement) et `release_dist/` sont générés par
+`npm run package` et ignorés par Git ; le dossier `vendor/three` **livré dans l'archive**
+se trouve à côté de l'exécutable.
 
 ## Limites connues
 
