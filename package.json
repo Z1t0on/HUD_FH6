@@ -1,6 +1,6 @@
 {
   "name": "hud-fh6",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "HUD de télémétrie pour Forza Horizon 6 (flux Data Out UDP)",
   "type": "module",
