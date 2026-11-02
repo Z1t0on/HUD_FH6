@@ -23,6 +23,7 @@ await build({
   platform: "node",
   format: "cjs",
   target: "node22",
+  external: ["three", "three/webgpu", "three/tsl", "three/examples/jsm/controls/OrbitControls.js", "three/examples/jsm/controls/PointerLockControls.js"],
   legalComments: "none",
   // `server.ts` garde un repli `import.meta.url` pour l'exécution ESM ; ici
   // `__dirname` existe toujours, ce repli n'est jamais évalué.

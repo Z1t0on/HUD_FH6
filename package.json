@@ -4,6 +4,7 @@
   "private": true,
   "description": "HUD de télémétrie pour Forza Horizon 6 (flux Data Out UDP)",
   "type": "module",
+  "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
@@ -15,25 +16,28 @@
   },
   "pkg": {
     "assets": [
-      "public/**/*",
-      "assets/**/*"
+      "public/**/*"
+    ],
+    "ignore": [
+      "**/node_modules/three/**"
     ],
     "targets": [
       "node22-win-x64"
-    ]
+    ],
+    "outputPath": "release_dist"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@yao-pkg/pkg": "^6.24.0",
+    "@yao-pkg/pkg-fetch": "^3.6.7",
     "esbuild": "^0.28.2",
     "resedit": "^3.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   },
-  "dependencies": {
-    "three": "^0.186.1"
-  },
-  "main": "index.js",
   "directories": {
     "test": "test"
   },
@@ -45,5 +49,8 @@
   "bugs": {
     "url": "https://github.com/Z1t0on/HUD_FH6/issues"
   },
-  "homepage": "https://github.com/Z1t0on/HUD_FH6#readme"
+  "homepage": "https://github.com/Z1t0on/HUD_FH6#readme",
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
 }

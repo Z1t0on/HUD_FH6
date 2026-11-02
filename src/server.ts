@@ -20,8 +20,11 @@ const APP_ROOT = resolve(MODULE_DIR, "..");
 const DATA_ROOT = IS_PACKAGED ? dirname(process.execPath) : APP_ROOT;
 
 const PUBLIC_DIR = join(APP_ROOT, "public");
-/** Three.js servi au navigateur : copie figée (vendor/) ou node_modules en dev. */
-const VENDOR_DIR = join(APP_ROOT, "vendor", "three");
+/**
+ * Three.js servi au navigateur : copie figée livrée à côté de l'exécutable
+ * (`vendor/three`, hors snapshot pkg) ou `node_modules` en développement.
+ */
+const VENDOR_DIR = join(IS_PACKAGED ? DATA_ROOT : APP_ROOT, "vendor", "three");
 const THREE_DIR = existsSync(join(VENDOR_DIR, "build"))
   ? VENDOR_DIR
   : join(APP_ROOT, "node_modules", "three");
@@ -368,6 +371,12 @@ server.listen(HTTP_PORT, () => {
     );
   } else {
     console.log("[hud] aucune IP locale détectée (réseau indisponible ?)");
+  }
+  if (!existsSync(join(THREE_DIR, "build", "three.module.js"))) {
+    console.warn(
+      `[hud] Three.js introuvable dans ${THREE_DIR} : la carte 3D restera vide ` +
+        "(le dossier vendor/three doit rester à côté de l'exécutable).",
+    );
   }
 });
 
